@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class RevokeAccess extends ActionHandler {
   payload: RevokeAccessAction
@@ -8,16 +9,16 @@ export class RevokeAccess extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
-    if (this.userId === this.payload.userId) return true
-    return db.getHasAccess(this.userId, this.payload.documentId)
+  async checkIsAuthorized(service: LocalService) {
+    return service.getHasAccess(this.userId, this.payload.documentId)
   }
 
-  async execute(db: DatabaseInterface) {
-    await db.deleteGrant(this.payload.documentId, this.payload.userId)
+  async execute(service: LocalService) {
+    await service.db.deleteGrant(this.payload.documentId, this.payload.kind, this.payload.id)
     return {
       documentId: this.payload.documentId,
-      userId: this.payload.userId
+      kind: this.payload.kind,
+      id: this.payload.id
     } as RevokeAccessResult
   }
 }

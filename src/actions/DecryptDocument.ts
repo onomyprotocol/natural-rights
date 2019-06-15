@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class DecryptDocument extends ActionHandler {
   payload: DecryptDocumentAction
@@ -8,13 +9,21 @@ export class DecryptDocument extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
-    return db.getHasAccess(this.userId, this.payload.documentId)
+  async checkIsAuthorized(service: LocalService) {
+    return service.getHasAccess(this.userId, this.payload.documentId)
   }
 
-  async execute(db: DatabaseInterface) {
-    throw new Error('Not yet implemented')
+  async execute(service: LocalService) {
+    const encCryptPrivKey = await service.getDeviceEncryptedDocumentKey(
+      this.userId,
+      this.deviceId,
+      this.payload.documentId
+    )
+    if (!encCryptPrivKey) throw new Error('No access')
 
-    return this.payload as DecryptDocumentResult
+    return {
+      documentId: this.payload.documentId,
+      encCryptPrivKey
+    } as DecryptDocumentResult
   }
 }

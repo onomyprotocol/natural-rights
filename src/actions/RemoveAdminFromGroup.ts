@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class RemoveAdminFromGroup extends ActionHandler {
   payload: RemoveAdminFromGroupAction
@@ -8,14 +9,13 @@ export class RemoveAdminFromGroup extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
-    if (this.payload.userId === this.userId) return true
-    return db.getIsGroupAdmin(this.payload.groupId, this.userId)
+  async checkIsAuthorized(service: LocalService) {
+    return service.getIsGroupAdmin(this.payload.groupId, this.userId)
   }
 
-  async execute(db: DatabaseInterface) {
-    const membership = await db.getMembership(this.payload.groupId, this.payload.userId)
-    if (membership) await db.putMembership({ ...membership, encGroupCryptPrivKey: '' })
+  async execute(service: LocalService) {
+    const membership = await service.db.getMembership(this.payload.groupId, this.payload.userId)
+    if (membership) await service.db.putMembership({ ...membership, encGroupCryptPrivKey: '' })
     return {
       groupId: this.payload.groupId,
       userId: this.payload.userId

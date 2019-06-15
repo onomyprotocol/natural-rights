@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class AddAdminToGroup extends ActionHandler {
   payload: AddAdminToGroupAction
@@ -8,19 +9,17 @@ export class AddAdminToGroup extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
-    return db.getIsGroupAdmin(this.payload.groupId, this.userId)
+  async checkIsAuthorized(service: LocalService) {
+    return service.getIsGroupAdmin(this.payload.groupId, this.userId)
   }
 
-  async execute(db: DatabaseInterface) {
-    const membership = await db.getMembership(this.payload.groupId, this.payload.userId)
+  async execute(service: LocalService) {
+    const membership = await service.db.getMembership(this.payload.groupId, this.payload.userId)
 
     if (!membership) throw new Error('No membership for user')
 
-    await db.putMembership({
+    await service.db.putMembership({
       ...membership,
-      groupId: this.payload.groupId,
-      userId: this.payload.userId,
       encGroupCryptPrivKey: this.payload.encCryptPrivKey
     })
 

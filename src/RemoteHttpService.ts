@@ -1,17 +1,24 @@
+import 'isomorphic-fetch'
+
 export class RemoteHttpService implements ServiceInterface {
   primitives: PrimitivesInterface
-  baseUrl: string
+  url: string
 
-  constructor(primitives: PrimitivesInterface, baseUrl: string) {
+  constructor(primitives: PrimitivesInterface, url: string) {
     this.primitives = primitives
-    this.baseUrl = baseUrl
+    this.url = url
   }
 
   async request(req: NaturalRightsRequest) {
-    throw new Error('Not yet implemented')
-
-    return {
-      results: []
-    } as NaturalRightsResponse
+    const httpResponse = await fetch(this.url, {
+      method: 'POST',
+      body: JSON.stringify(req),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    if (httpResponse.status >= 300) throw new Error('Bad HTTP Response')
+    const response = await httpResponse.json()
+    return response as NaturalRightsResponse
   }
 }

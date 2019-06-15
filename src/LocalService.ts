@@ -1,35 +1,9 @@
 import { Database } from './Database'
 import * as actions from './actions'
+import { ActionHandler } from './actions/ActionHandler'
 
-function getActionType(type: string) {
-  switch (type) {
-    case 'InitializeUser':
-      return actions.InitializeUser
-    case 'AddDevice':
-      return actions.AddDevice
-    case 'RemoveDevice':
-      return actions.RemoveDevice
-    case 'CreateGroup':
-      return actions.CreateGroup
-    case 'RemoveMemberFromGroup':
-      return actions.RemoveMemberFromGroup
-    case 'AddAdminToGroup':
-      return actions.AddAdminToGroup
-    case 'RemoveAdminFromGroup':
-      return actions.RemoveAdminFromGroup
-    case 'EncryptDocument':
-      return actions.EncryptDocument
-    case 'GrantAccess':
-      return actions.GrantAccess
-    case 'DecryptDocument':
-      return actions.DecryptDocument
-    case 'RevokeAccess':
-      return actions.RevokeAccess
-    case 'UpdateDocument':
-      return actions.UpdateDocument
-    default:
-      return null
-  }
+function isValidActionType(type: string): type is keyof typeof actions {
+  return type in actions
 }
 
 export class LocalService implements ServiceInterface {
@@ -41,15 +15,39 @@ export class LocalService implements ServiceInterface {
     this.db = new Database(adapter)
   }
 
+  getActionHandler(req: NaturalRightsRequest, action: Action<any>) {
+    if (!isValidActionType(action.type)) return null
+    const ActionType: any = actions[action.type]
+    return new ActionType(req.userId, req.deviceId, action.payload) as ActionHandler
+  }
+
+  parseRequestBody(req: NaturalRightsRequest) {
+    return JSON.parse(req.body) as NaturalRightsAction[]
+  }
+
+  async authenticateInitializeUser(req: NaturalRightsRequest) {
+    const actions = this.parseRequestBody(req)
+    const initializeUserActions = actions.filter(action => action.type === 'InitializeUser')
+    const addDeviceActions = actions.filter(({ type }) => type === 'AddDevice')
+    if (initializeUserActions.length !== 1 || addDeviceActions.length !== 1) return false
+    const initializeUser = initializeUserActions[0].payload as InitializeUserAction
+    const addDevice = addDeviceActions[0].payload as AddDeviceAction
+
+    const user = await this.db.getUser(initializeUser.userId)
+    if (user) return false
+
+    return this.primitives.verify(addDevice.signPubKey, req.signature, req.body)
+  }
+
   async authenticate(req: NaturalRightsRequest) {
     const device = await this.db.getDevice(req.userId, req.deviceId)
-    if (!device || !device.signPubKey) return false
+    if (!device || !device.signPubKey) return this.authenticateInitializeUser(req)
     return this.primitives.verify(device.signPubKey, req.signature, req.body)
   }
 
   async request(req: NaturalRightsRequest) {
     const results: Result[] = []
-    const actions: NaturalRightsAction[] = JSON.parse(req.body)
+    const actions = this.parseRequestBody(req)
 
     if (!(await this.authenticate(req))) {
       return {
@@ -69,8 +67,8 @@ export class LocalService implements ServiceInterface {
   }
 
   async processAction(req: NaturalRightsRequest, action: Action<any>) {
-    const ActionType = getActionType(action.type)
-    if (!ActionType) {
+    const handler = this.getActionHandler(req, action)
+    if (!handler) {
       return {
         type: action.type,
         payload: action.payload,
@@ -78,8 +76,7 @@ export class LocalService implements ServiceInterface {
         error: 'Invalid action type'
       } as Result
     }
-    const handler = new ActionType(req.userId, req.deviceId, action.payload)
-    if (!(await handler.checkIsAuthorized(this.db))) {
+    if (!(await handler.checkIsAuthorized(this))) {
       return {
         type: action.type,
         payload: action.payload,
@@ -89,7 +86,62 @@ export class LocalService implements ServiceInterface {
     }
     return {
       ...action,
-      payload: await handler.execute(this.db)
+      payload: await handler.execute(this),
+      success: true,
+      error: ''
     } as Result
+  }
+
+  async getIsGroupAdmin(groupId: string, userId: string) {
+    const [group, membership] = await Promise.all([
+      this.db.getGroup(groupId),
+      this.db.getMembership(groupId, userId)
+    ])
+    if (group && group.userId === userId) return true
+    return !!(group && membership && membership.encGroupCryptPrivKey)
+  }
+
+  async getCredentials(userId: string, documentId: string) {
+    const [document, grants] = await Promise.all([
+      this.db.getDocument(documentId),
+      this.db.getDocumentGrants(documentId)
+    ])
+
+    if (!document) return
+    if (document.userId === userId) return { document }
+
+    for (let grant of grants) {
+      if (grant.kind === 'user') {
+        if (grant.id === userId) return { document, grant }
+        continue
+      }
+
+      const membership = await this.db.getMembership(grant.id, userId)
+      if (membership) return { document, grant, membership }
+    }
+  }
+
+  async getUserEncryptedDocumentKey(userId: string, documentId: string) {
+    const credentials = await this.getCredentials(userId, documentId)
+    if (!credentials) return ''
+    if (!credentials.grant) return credentials.document.encCryptPrivKey
+    if (!credentials.membership) return credentials.grant.encCryptPrivKey
+    return this.primitives.cryptTransform(
+      credentials.membership.cryptTransformKey,
+      credentials.grant.encCryptPrivKey
+    )
+  }
+
+  async getDeviceEncryptedDocumentKey(userId: string, deviceId: string, documentId: string) {
+    const [userKey, device] = await Promise.all([
+      this.getUserEncryptedDocumentKey(userId, documentId),
+      this.db.getDevice(userId, deviceId)
+    ])
+    if (!userKey || !device || !device.cryptTransformKey) return ''
+    return this.primitives.cryptTransform(device.cryptTransformKey, userKey)
+  }
+
+  async getHasAccess(userId: string, documentId: string) {
+    return !!(await this.getCredentials(userId, documentId))
   }
 }

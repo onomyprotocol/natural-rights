@@ -1,3 +1,5 @@
+import { LocalService } from '../LocalService'
+
 export class ActionHandler {
   userId: string
   deviceId: string
@@ -7,11 +9,11 @@ export class ActionHandler {
     this.deviceId = deviceId
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
+  async checkIsAuthorized(service: LocalService) {
     return false
   }
 
-  async execute(db: DatabaseInterface) {
+  async execute(service: LocalService) {
     return null as ResultType
   }
 }

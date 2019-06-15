@@ -1,75 +1,649 @@
 import { LocalService } from '../LocalService'
+import { ActionHandler } from '../actions/ActionHandler'
+import { EncryptDocument } from '../actions'
 
 describe('LocalService', () => {
-  describe('initializeUser', () => {
-    it.todo('verifies signature of request matches new id')
+  let primitives: PrimitivesInterface
+  let db: DatabaseInterface
+  let dbAdapter: DatabaseAdapterInterface
+  let service: LocalService
 
-    it.todo('persists encrypted private keys for user')
-    it.todo("adds the user's first device")
+  beforeEach(() => {
+    primitives = {
+      cryptKeyGen: jest.fn().mockResolvedValue({
+        privKey: 'cryptPrivKey',
+        pubKey: 'cryptPubKey'
+      }),
+      signKeyGen: jest.fn().mockResolvedValue({
+        privKey: 'signPrivKey',
+        pubKey: 'signPubKey'
+      }),
+      cryptTransformKeyGen: jest
+        .fn()
+        .mockImplementation(async (keyPair, pubKey) => `transform:${keyPair.privKey}:${pubKey}`),
+      encrypt: jest
+        .fn()
+        .mockImplementation(async (pubKey, plaintext) => `encrypted:${pubKey}:${plaintext}`),
+      cryptTransform: jest.fn(),
+      decrypt: jest.fn(),
+      sign: jest.fn(),
+      verify: jest.fn()
+    }
+
+    dbAdapter = {
+      get: jest.fn().mockResolvedValue(null),
+      put: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+      getDocumentGrants: jest.fn().mockResolvedValue([]),
+      close: jest.fn()
+    }
+
+    service = new LocalService(primitives, dbAdapter)
+    db = service.db
   })
 
-  describe('addDevice', () => {
-    it.todo('verifies signature of request matches user')
-    it.todo('verifies signature from device key?')
+  describe('authenticateInitializeUser', () => {
+    const userId = 'testUserId'
+    const userCryptPubKey = 'userCryptPubKey'
+    const userSignPubKey = 'userSignPubKey'
+    const userEncCryptPrivKey = 'userEncCryptPrivKey'
+    const userEncSignPrivKey = 'userEncSignPrivKey'
+    const deviceId = 'testDeviceId'
+    const deviceCryptPubKey = 'deviceCryptPubKey'
+    const deviceSignPubKey = 'deviceSignPubKey'
+    const deviceCryptTransformKey = 'deviceCryptTransformKey'
 
-    it.todo('persists transformKey and metadata')
+    const actions = [
+      {
+        type: 'InitializeUser',
+        payload: {
+          userId,
+          cryptPubKey: userCryptPubKey,
+          signPubKey: userSignPubKey,
+          encCryptPrivKey: userEncCryptPrivKey,
+          encSignPrivKey: userEncSignPrivKey
+        } as InitializeUserAction
+      },
+      {
+        type: 'AddDevice',
+        payload: {
+          deviceId,
+          userId,
+          cryptPubKey: deviceCryptPubKey,
+          signPubKey: deviceSignPubKey,
+          cryptTransformKey: deviceCryptTransformKey
+        } as AddDeviceAction
+      }
+    ]
+    const signature = 'expectedSignature'
+    const request = {
+      userId,
+      deviceId,
+      body: JSON.stringify(actions),
+      signature
+    }
+
+    it('returns true if valid signed InitializeUser request', async () => {
+      service.primitives.verify = jest.fn().mockResolvedValue(true)
+      expect(await service.authenticateInitializeUser(request)).toEqual(true)
+      expect(service.primitives.verify).toBeCalledWith(
+        deviceSignPubKey,
+        request.signature,
+        request.body
+      )
+    })
+
+    it("returns false if actions don't include a single InitializeUser and AddDevice", async () => {
+      service.primitives.verify = jest.fn().mockResolvedValue(true)
+      const badRequest = {
+        ...request,
+        body: JSON.stringify([actions[0]])
+      }
+      expect(await service.authenticateInitializeUser(badRequest)).toEqual(false)
+      expect(service.primitives.verify).not.toBeCalled()
+    })
+
+    it('returns false if signature cannot be verified', async () => {
+      service.primitives.verify = jest.fn().mockResolvedValue(false)
+      expect(await service.authenticateInitializeUser(request)).toEqual(false)
+      expect(service.primitives.verify).toBeCalledWith(
+        deviceSignPubKey,
+        request.signature,
+        request.body
+      )
+    })
+
+    it('returns false if user already exists', async () => {
+      db.getUser = jest.fn().mockResolvedValue({
+        userId
+      })
+
+      expect(await service.authenticateInitializeUser(request)).toEqual(false)
+      expect(db.getUser).toBeCalledWith(userId)
+    })
   })
 
-  describe('removeDevice', () => {
-    it.todo('verifies signature of request matches user')
+  describe('authenticate', () => {
+    const userId = 'testUserId'
+    const userCryptPubKey = 'userCryptPubKey'
+    const userSignPubKey = 'userSignPubKey'
+    const userEncCryptPrivKey = 'userEncCryptPrivKey'
+    const userEncSignPrivKey = 'userEncSignPrivKey'
+    const deviceId = 'testDeviceId'
+    const deviceCryptPubKey = 'deviceCryptPubKey'
+    const deviceSignPubKey = 'deviceSignPubKey'
+    const deviceCryptTransformKey = 'deviceCryptTransformKey'
 
-    it.todo('deletes device record from database')
+    const actions = [
+      {
+        type: 'InitializeUser',
+        payload: {
+          userId,
+          cryptPubKey: userCryptPubKey,
+          signPubKey: userSignPubKey,
+          encCryptPrivKey: userEncCryptPrivKey,
+          encSignPrivKey: userEncSignPrivKey
+        } as InitializeUserAction
+      },
+      {
+        type: 'AddDevice',
+        payload: {
+          deviceId,
+          userId,
+          cryptPubKey: deviceCryptPubKey,
+          signPubKey: deviceSignPubKey,
+          cryptTransformKey: deviceCryptTransformKey
+        } as AddDeviceAction
+      }
+    ]
+    const signature = 'expectedSignature'
+    const request = {
+      userId,
+      deviceId,
+      body: JSON.stringify(actions),
+      signature
+    }
+
+    it('returns true if the request is signed by valid user', async () => {
+      const deviceRecord: DeviceRecord = {
+        id: deviceId,
+        userId,
+        signPubKey: 'deviceSignPubKey',
+        cryptPubKey: 'deviceCryptPubKey',
+        cryptTransformKey: 'deviceCryptTransformKey'
+      }
+      service.authenticateInitializeUser = jest.fn().mockResolvedValue(false)
+      db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
+      primitives.verify = jest.fn().mockResolvedValue(true)
+
+      expect(await service.authenticate(request)).toEqual(true)
+      expect(primitives.verify).toBeCalledWith(
+        deviceRecord.signPubKey,
+        request.signature,
+        request.body
+      )
+      expect(service.authenticateInitializeUser).not.toBeCalled()
+    })
+
+    it('returns false if the request is not signed by valid user', async () => {
+      const deviceRecord: DeviceRecord = {
+        id: deviceId,
+        userId,
+        signPubKey: 'deviceSignPubKey',
+        cryptPubKey: 'deviceCryptPubKey',
+        cryptTransformKey: 'deviceCryptTransformKey'
+      }
+      service.authenticateInitializeUser = jest.fn().mockResolvedValue(false)
+      db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
+      primitives.verify = jest.fn().mockResolvedValue(false)
+
+      expect(await service.authenticate(request)).toEqual(false)
+      expect(primitives.verify).toBeCalledWith(
+        deviceRecord.signPubKey,
+        request.signature,
+        request.body
+      )
+      expect(service.authenticateInitializeUser).not.toBeCalled()
+    })
+
+    it('defers to authenticateInitialUser if device cannot be found', async () => {
+      service.authenticateInitializeUser = jest.fn().mockResolvedValue(true)
+
+      expect(await service.authenticate(request)).toEqual(true)
+      expect(service.authenticateInitializeUser).toBeCalledWith(request)
+    })
   })
 
-  describe('createGroup', () => {
-    it.todo('verifies signature of request matches user')
+  describe('request', () => {
+    const actions = [
+      {
+        type: 'EncryptDocument',
+        payload: {
+          documentId: 'testDocumentId',
+          userId: 'testUserId',
+          encCryptPrivKey: 'testEncCryptPrivKey'
+        }
+      },
+      {
+        type: 'GrantAccess',
+        payload: {
+          documentId: 'testOocumentId',
+          kind: 'user',
+          id: 'testUser2Id',
+          encCryptPrivKey: 'test2EncCryptPrivKey'
+        }
+      }
+    ]
 
-    it.todo('persists groupId, publicKey, userId and encryptedPrivateKey')
+    const request = {
+      userId: 'testUserId',
+      deviceId: 'testDeviceId',
+      signature: 'testSignature',
+      body: JSON.stringify(actions)
+    }
+
+    it('Returns an authentication error for each action if request is not authenticated', async () => {
+      service.authenticate = jest.fn().mockResolvedValue(false)
+      service.processAction = jest.fn().mockImplementation(async (req, action) => action)
+      expect(await service.request(request)).toEqual({
+        results: actions.map(result => ({
+          ...result,
+          success: false,
+          error: 'Authentication error'
+        }))
+      })
+      expect(service.authenticate).toBeCalledWith(request)
+      expect(service.processAction).not.toBeCalled()
+    })
+
+    it('processes actions in body if request authenticates', async () => {
+      service.authenticate = jest.fn().mockResolvedValue(true)
+      service.processAction = jest.fn().mockImplementation(async (req, action) => action)
+      expect(await service.request(request)).toEqual({
+        results: actions
+      })
+      expect(service.authenticate).toBeCalledWith(request)
+      actions.map(action => expect(service.processAction).toBeCalledWith(request, action))
+    })
   })
 
-  describe('addMemberToGroup', () => {
-    it.todo('verifies signature of request matches group admin')
+  describe('getActionHandler', () => {
+    const userId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const action = {
+      type: 'EncryptDocument',
+      payload: {
+        documentId: 'testDocumentId',
+        userId: 'testUserId',
+        encCryptPrivKey: 'testEncCryptPrivKey'
+      }
+    } as Action<any>
 
-    it.todo('persists groupId, userId, transformKey')
+    const request = {
+      userId,
+      deviceId,
+      signature: 'testSignature',
+      body: JSON.stringify([action])
+    }
+
+    it('returns null if action type is not valid', async () => {
+      const invalidAction = JSON.parse('{ "type": "InvalidAction" }') as Action<any>
+      expect(service.getActionHandler(request, invalidAction)).toEqual(null)
+    })
+
+    it('returns ActionHandler instance if type is valid', async () => {
+      expect(service.getActionHandler(request, action)).toEqual(
+        new EncryptDocument(userId, deviceId, action.payload)
+      )
+    })
   })
 
-  describe('removeMemberFromGroup', () => {
-    it.todo('verifies signature of request matches admin or member to remove')
+  describe('processAction', () => {
+    const userId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const handler = new ActionHandler(userId, deviceId)
+    const action = {
+      type: 'EncryptDocument',
+      payload: {
+        documentId: 'testDocumentId',
+        userId: 'testUserId',
+        encCryptPrivKey: 'testEncCryptPrivKey'
+      }
+    } as Action<any>
 
-    it.todo('deletes membership record from database')
+    const request = {
+      userId,
+      deviceId,
+      signature: 'testSignature',
+      body: JSON.stringify([action])
+    }
+
+    it('returns an unauthorized error if action is not authorized', async () => {
+      handler.checkIsAuthorized = jest.fn().mockResolvedValue(false)
+      handler.execute = jest.fn()
+      service.getActionHandler = jest.fn().mockReturnValue(handler)
+
+      expect(await service.processAction(request, action)).toEqual({
+        ...action,
+        success: false,
+        error: 'Unauthorized'
+      })
+      expect(handler.checkIsAuthorized).toBeCalled()
+      expect(service.getActionHandler).toBeCalledWith(request, action)
+      expect(handler.execute).not.toBeCalled()
+    })
+
+    it('executes the action if it is authorized', async () => {
+      handler.checkIsAuthorized = jest.fn().mockResolvedValue(true)
+      service.getActionHandler = jest.fn().mockReturnValue(handler)
+      handler.execute = jest.fn().mockResolvedValue(action.payload)
+
+      expect(await service.processAction(request, action)).toEqual({
+        ...action,
+        success: true,
+        error: ''
+      })
+      expect(handler.checkIsAuthorized).toBeCalled()
+      expect(service.getActionHandler).toBeCalledWith(request, action)
+      expect(handler.execute).toBeCalledWith(service)
+    })
+
+    it('returns an error if action is invalid', async () => {
+      const invalidAction = JSON.parse('{ "type": "InvalidAction" }') as Action<any>
+      expect(await service.processAction(request, invalidAction)).toEqual({
+        ...invalidAction,
+        success: false,
+        error: 'Invalid action type'
+      })
+    })
   })
 
-  describe('addAdminToGroup', () => {
-    it.todo('verifies signature of request matches admin')
+  describe('getIsGroupAdmin', () => {
+    it('Resolves true if user is admin of group', async () => {
+      const groupId = 'testGroupId'
+      const testUserId = 'testUserId'
+      db.getMembership = jest.fn().mockResolvedValue({
+        groupId,
+        userId: testUserId,
 
-    it.todo('persists membership with encrypted private key')
+        cryptTransformKey: 'cryptTransformKey',
+
+        encGroupCryptPrivKey: 'validityofthisisnotchecked'
+      } as MembershipRecord)
+
+      db.getGroup = jest.fn().mockResolvedValue({ groupId })
+
+      const isGroupAdmin = await service.getIsGroupAdmin(groupId, testUserId)
+
+      expect(isGroupAdmin).toEqual(true)
+      expect(db.getMembership).toBeCalledWith(groupId, testUserId)
+    })
+
+    it('Resolves false if user not admin of group', async () => {
+      const groupId = 'testGroupId'
+      const testUserId = 'testUserId'
+      db.getMembership = jest.fn().mockResolvedValue({
+        groupId,
+        userId: testUserId,
+
+        cryptTransformKey: 'cryptTransformKey',
+
+        encGroupCryptPrivKey: ''
+      } as MembershipRecord)
+
+      const isGroupAdmin = await service.getIsGroupAdmin(groupId, testUserId)
+
+      expect(isGroupAdmin).toEqual(false)
+      expect(db.getMembership).toBeCalledWith(groupId, testUserId)
+    })
+
+    it('Resolves false if user not a member', async () => {
+      const groupId = 'testGroupId'
+      const testUserId = 'testUserId'
+      const isGroupAdmin = await service.getIsGroupAdmin(groupId, testUserId)
+
+      expect(isGroupAdmin).toEqual(false)
+    })
   })
 
-  describe('removeAdminFromGroup', () => {
-    it.todo('verifies signature of request matches admin')
+  describe('getCredentials', () => {
+    it('resolves undefined if user has no access to document', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = {
+        userId: 'someOtherUser',
+        documentId,
+        encCryptPrivKey: 'docEncCryptPrivKey'
+      }
+      db.getDocument = jest.fn().mockResolvedValue(document)
+      db.getDocumentGrants = jest.fn().mockResolvedValue([])
 
-    it.todo('deletes encrypted private key for membership')
+      expect(await service.getCredentials(userId, documentId)).toEqual(undefined)
+      expect(db.getDocument).toBeCalledWith(documentId)
+      expect(db.getDocumentGrants).toBeCalledWith(documentId)
+    })
+
+    it('resolves undefined if document does not exist', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      db.getDocument = jest.fn().mockResolvedValue(undefined)
+      db.getDocumentGrants = jest.fn().mockResolvedValue([])
+
+      expect(await service.getCredentials(userId, documentId)).toEqual(undefined)
+      expect(db.getDocument).toBeCalledWith(documentId)
+      expect(db.getDocumentGrants).toBeCalledWith(documentId)
+    })
+
+    it('resolves { document } if user is owner of document', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = {
+        userId,
+        documentId,
+        encCryptPrivKey: 'docEncCryptPrivKey'
+      }
+      db.getDocument = jest.fn().mockResolvedValue(document)
+      db.getDocumentGrants = jest.fn().mockResolvedValue([])
+
+      expect(await service.getCredentials(userId, documentId)).toEqual({ document })
+      expect(db.getDocument).toBeCalledWith(documentId)
+      expect(db.getDocumentGrants).toBeCalledWith(documentId)
+    })
+
+    it('resolves { document, grant } if user is directly granted access to document', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = {
+        userId: 'someOtherUser',
+        documentId,
+        encCryptPrivKey: 'docEncCryptPrivKey'
+      }
+      const grant = {
+        id: userId,
+        kind: 'user'
+      }
+
+      db.getMembership = jest.fn().mockResolvedValue(null)
+      db.getDocument = jest.fn().mockResolvedValue(document)
+      db.getDocumentGrants = jest.fn().mockResolvedValue([
+        {
+          id: 'someOtherId',
+          kind: 'user'
+        },
+        {
+          id: 'someRandomGroup',
+          kind: 'group'
+        },
+        grant
+      ])
+
+      expect(await service.getCredentials(userId, documentId)).toEqual({ document, grant })
+      expect(db.getDocument).toBeCalledWith(documentId)
+      expect(db.getDocumentGrants).toBeCalledWith(documentId)
+      expect(db.getMembership).toBeCalledWith('someRandomGroup', userId)
+    })
+
+    it('resolves { document, grant, membership } if user is granted access to document via a group', async () => {
+      const userId = 'testUserId'
+      const groupId = 'testGroupId'
+      const documentId = 'testDocumentId'
+      const document = {
+        userId: 'someOtherUser',
+        documentId,
+        encCryptPrivKey: 'docEncCryptPrivKey'
+      }
+      const grant = {
+        id: groupId,
+        kind: 'group'
+      }
+      const membership = {
+        userId,
+        groupId
+      }
+
+      db.getMembership = jest.fn().mockResolvedValue(membership)
+      db.getDocument = jest.fn().mockResolvedValue(document)
+      db.getDocumentGrants = jest.fn().mockResolvedValue([
+        {
+          id: 'someOtherId',
+          kind: 'user'
+        },
+        grant
+      ])
+
+      expect(await service.getCredentials(userId, documentId)).toEqual({
+        document,
+        grant,
+        membership
+      })
+      expect(db.getDocument).toBeCalledWith(documentId)
+      expect(db.getDocumentGrants).toBeCalledWith(documentId)
+      expect(db.getMembership).toBeCalledWith(groupId, userId)
+    })
   })
 
-  describe('encryptDocument', () => {
-    it.todo('verifies signature of request matches owner')
+  describe('getUserEncryptedDocumentKey', () => {
+    it("resolves '' if user has no access to document", async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      service.getCredentials = jest.fn().mockResolvedValue(undefined)
 
-    it.todo('persists documentId, ownerId, and encrypted decryption key')
+      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual('')
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+    })
+
+    it('resolves document.encCryptPrivKey if user is owner of document', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = { encCryptPrivKey: 'docEncCryptPrivKey' }
+      service.getCredentials = jest.fn().mockResolvedValue({ document })
+
+      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(
+        document.encCryptPrivKey
+      )
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+    })
+
+    it('resolves grant.encCryptPrivKey if user is directly granted access to document', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = { encCryptPrivKey: 'docEncCryptPrivKey' }
+      const grant = { encCryptPrivKey: 'grantEncCryptPrivKey' }
+      service.getCredentials = jest.fn().mockResolvedValue({ document, grant })
+
+      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(
+        grant.encCryptPrivKey
+      )
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+    })
+
+    it('resolves transformed key if user is granted access to document via a group', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
+      const document = { encCryptPrivKey: 'docEncCryptPrivKey' }
+      const grant = { encCryptPrivKey: 'grantEncCryptPrivKey' }
+      const membership = {
+        cryptTransformKey: 'memberCryptTransformKey',
+        encCryptPrivKey: 'memberEncCryptPrivKey'
+      }
+      const transformedKey = 'transformedCryptPrivKey'
+      service.getCredentials = jest.fn().mockResolvedValue({ document, grant, membership })
+      primitives.cryptTransform = jest.fn().mockResolvedValue(transformedKey)
+
+      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(transformedKey)
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+      expect(primitives.cryptTransform).toBeCalledWith(
+        membership.cryptTransformKey,
+        grant.encCryptPrivKey
+      )
+    })
   })
 
-  describe('grantAccess', () => {
-    it.todo('verifies signature of request matches owner or user with access')
+  describe('getDeviceEncryptedDocumentKey', () => {
+    it("resolves '' if the device does not exist", async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+      const documentId = 'testDocumentId'
+      db.getDevice = jest.fn().mockResolvedValue(null)
+      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue('letspretendthisexists')
 
-    it.todo('persists documentId, userIdOrGroupId, encryptedDecryptionKey')
+      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual('')
+      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+    })
+
+    it("resolves '' if the user has no access to document", async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+      const documentId = 'testDocumentId'
+      db.getDevice = jest.fn().mockResolvedValue({
+        id: deviceId,
+        userId,
+        cryptTransformKey: 'deviceCryptTransformKey'
+      } as DeviceRecord)
+      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue('')
+
+      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual('')
+      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+    })
+
+    it('resolves a document key transformed to device if user has access', async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+      const documentId = 'testDocumentId'
+      const deviceRecord = {
+        id: deviceId,
+        userId,
+        cryptTransformKey: 'deviceCryptTransformKey'
+      } as DeviceRecord
+      db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
+      const userEncCryptPrivKey = 'userEncCryptPrivKey'
+      const deviceEncCryptPrivKey = 'deviceEncCryptPrivKey'
+      primitives.cryptTransform = jest.fn().mockResolvedValue(deviceEncCryptPrivKey)
+      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue(userEncCryptPrivKey)
+
+      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual(
+        deviceEncCryptPrivKey
+      )
+      expect(service.getUserEncryptedDocumentKey).toBeCalledWith(userId, documentId)
+      expect(primitives.cryptTransform).toBeCalledWith(
+        deviceRecord.cryptTransformKey,
+        userEncCryptPrivKey
+      )
+    })
   })
 
-  describe('decryptDocument', () => {})
+  describe('getHasAccess', () => {
+    it('resolves true if getCredentials resolves truthy', async () => {
+      const userId = 'testUserId'
+      const documentId = 'testDocumentId'
 
-  describe('revokeAccess', () => {
-    it.todo('verifies signature of request matches owner or user with access')
+      service.getCredentials = jest.fn().mockResolvedValue(undefined)
+      expect(await service.getHasAccess(userId, documentId)).toEqual(false)
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
 
-    it.todo('deletes grant record')
+      service.getCredentials = jest.fn().mockResolvedValue({})
+      expect(await service.getHasAccess(userId, documentId)).toEqual(true)
+      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+    })
   })
-
-  describe('updateDocument', () => {})
 })

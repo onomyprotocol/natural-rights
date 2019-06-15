@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class UpdateDocument extends ActionHandler {
   payload: UpdateDocumentAction
@@ -8,16 +9,15 @@ export class UpdateDocument extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
-    if (this.userId !== this.payload.userId) return false
-    return db.getHasAccess(this.userId, this.payload.documentId)
+  async checkIsAuthorized(service: LocalService) {
+    return service.getHasAccess(this.userId, this.payload.documentId)
   }
 
-  async execute(db: DatabaseInterface) {
-    await db.putDocument({
+  async execute(service: LocalService) {
+    await service.db.putDocument({
       id: this.payload.documentId,
       userId: this.payload.userId,
-      encDecryptKey: this.payload.encCryptPrivKey
+      encCryptPrivKey: this.payload.encCryptPrivKey
     })
     return this.payload as UpdateDocumentResult
   }

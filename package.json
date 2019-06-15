@@ -45,6 +45,10 @@
     },
     "testEnvironment": "node",
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
     "moduleFileExtensions": [
       "ts",
       "tsx",
@@ -63,7 +67,17 @@
       }
     },
     "collectCoverageFrom": [
-      "src/*.{js,ts}"
+      "src/*.{js,ts}",
+      "src/actions/*.{js,ts}"
+    ],
+    "reporters": [
+      "default",
+      [
+        "./node_modules/jest-html-reporter",
+        {
+          "pageTitle": "Test Report"
+        }
+      ]
     ]
   },
   "prettier": {
@@ -78,6 +92,8 @@
   "devDependencies": {
     "@commitlint/cli": "^8.0.0",
     "@commitlint/config-conventional": "^8.0.0",
+    "@types/express": "^4.17.0",
+    "@types/isomorphic-fetch": "0.0.35",
     "@types/jest": "^24.0.13",
     "@types/node": "^12.0.7",
     "colors": "^1.3.3",
@@ -88,8 +104,10 @@
     "husky": "^2.4.0",
     "jest": "^24.8.0",
     "jest-config": "^24.8.0",
+    "jest-html-reporter": "^2.5.0",
     "lint-staged": "^8.2.0",
     "lodash.camelcase": "^4.3.0",
+    "mkdirp": "^0.5.1",
     "prettier": "^1.18.2",
     "prompt": "^1.0.0",
     "replace-in-file": "^4.1.0",
@@ -112,6 +130,9 @@
     "typescript": "^3.5.1"
   },
   "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "isomorphic-fetch": "^2.2.1",
     "node-lmdb": "^0.6.2"
   }
 }

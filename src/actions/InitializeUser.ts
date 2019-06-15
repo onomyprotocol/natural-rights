@@ -1,4 +1,5 @@
 import { ActionHandler } from './ActionHandler'
+import { LocalService } from '../LocalService'
 
 export class InitializeUser extends ActionHandler {
   payload: InitializeUserAction
@@ -8,14 +9,14 @@ export class InitializeUser extends ActionHandler {
     this.payload = payload
   }
 
-  async checkIsAuthorized(db: DatabaseInterface) {
+  async checkIsAuthorized(service: LocalService) {
     if (this.userId !== this.payload.userId) return false
-    const existing = await db.getUser(this.userId)
+    const existing = await service.db.getUser(this.userId)
     return !existing
   }
 
-  async execute(db: DatabaseInterface) {
-    await db.putUser({
+  async execute(service: LocalService) {
+    await service.db.putUser({
       id: this.payload.userId,
       signPubKey: this.payload.signPubKey,
       cryptPubKey: this.payload.cryptPubKey,

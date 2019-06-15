@@ -4,18 +4,23 @@ interface ClientInterface {
   service: ServiceInterface
 
   initializeUser: () => Promise<void>
-  addDevice: (deviceId: string) => Promise<void>
+  addDevice: (
+    deviceId: string
+  ) => Promise<{
+    deviceSignKeyPair: KeyPair
+    deviceCryptKeyPair: KeyPair
+  }>
   removeDevice: (deviceId: string) => Promise<void>
   createGroup: (groupId: string) => Promise<void>
   addMemberToGroup: (groupId: string, userId: string) => Promise<void>
   removeMemberFromGroup: (groupId: string, userId: string) => Promise<void>
   addAdminToGroup: (groupId: string, userId: string) => Promise<void>
   removeAdminFromGroup: (groupId: string, userId: string) => Promise<void>
-  encryptDocument: (documentId: string) => Promise<string>
-  grantAccess: (documentId: string, userOrGroupId: string) => Promise<void>
+  encryptDocument: (documentId: string) => Promise<KeyPair>
+  grantAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
   decryptDocument: (documentId: string) => Promise<string>
-  revokeAccess: (documentId: string, userOrGroupId: string) => Promise<void>
-  updateDocument: (documentId: string) => Promise<string>
+  revokeAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
+  updateDocument: (documentId: string) => Promise<KeyPair>
 }
 
 interface KeyPair {
@@ -39,112 +44,6 @@ interface ServiceInterface {
   request: (request: NaturalRightsRequest) => Promise<NaturalRightsResponse>
 }
 
-interface RequestFactoryInterface {
-  userId: string
-  deviceId: string
-
-  sign: (actions: Action<any>[]) => Promise<NaturalRightsRequest>
-
-  initializeUser: () => {
-    deviceCryptPrivKey: string
-    deviceSignPrivKey: string
-    actions: [Action<InitializeUserAction>, Action<AddDeviceAction>]
-  }
-
-  addDevice: (
-    userCryptPrivKey: string,
-    deviceId: string
-  ) => {
-    deviceCryptPrivKey: string
-    deviceSignPrivKey: string
-    actions: [Action<AddDeviceAction>]
-  }
-
-  removeDevice: (
-    deviceId: string
-  ) => {
-    actions: [Action<RemoveDeviceAction>]
-  }
-
-  createGroup: (
-    groupId: string
-  ) => {
-    actions: [
-      Action<CreateGroupAction>,
-      Action<AddMemberToGroupAction>,
-      Action<AddAdminToGroupAction>
-    ]
-  }
-
-  addMemberToGroup: (
-    groupCryptPrivKey: string,
-    groupId: string,
-    userId: string,
-    userCryptPubKey: string
-  ) => {
-    actions: [Action<AddMemberToGroupAction>]
-  }
-
-  removeMemberFromGroup: (
-    groupId: string,
-    userId: string
-  ) => {
-    actions: [Action<RemoveMemberFromGroupAction>]
-  }
-
-  addAdminToGroup: (
-    groupId: string,
-    groupCryptPrivKey: string,
-    userId: string,
-    userCryptPubKey: string
-  ) => {
-    actions: [Action<AddMemberToGroupAction>, Action<AddAdminToGroupAction>]
-  }
-
-  removeAdminFromGroup: (
-    groupId: string,
-    userId: string
-  ) => {
-    actions: [Action<RemoveAdminFromGroupAction>]
-  }
-
-  encryptDocument: (
-    documentId: string
-  ) => {
-    docCryptPrivKey: string
-    docCryptPubKey: string
-    actions: [Action<EncryptDocumentAction>]
-  }
-
-  grantAccess: (
-    documentId: string,
-    userId: string
-  ) => {
-    actions: [Action<GrantAccessAction>]
-  }
-
-  decryptDocument: (
-    documentId: string
-  ) => {
-    actions: [Action<DecryptDocumentAction>]
-  }
-
-  revokeAccess: (
-    documentId: string,
-    userId: string
-  ) => {
-    actions: [Action<RevokeAccessAction>]
-  }
-
-  updateDocument: (
-    documentId: string
-  ) => {
-    docCryptPrivKey: string
-    docCryptPubKey: string
-    actions: [Action<UpdateDocumentAction>]
-  }
-}
-
 type ActionType =
   | 'InitializeUser'
   | 'AddDevice'
@@ -159,6 +58,8 @@ type ActionType =
   | 'DecryptDocument'
   | 'RevokeAccess'
   | 'UpdateDocument'
+  | 'GetPubKeys'
+  | 'GetKeyPairs'
 
 interface Action<T> {
   type: ActionType
@@ -180,6 +81,8 @@ type ResultType =
   | DecryptDocumentResult
   | RevokeAccessResult
   | UpdateDocumentResult
+  | GetPubKeysResult
+  | GetKeyPairsResult
 
 interface Result {
   type: ActionType
@@ -195,8 +98,11 @@ interface DatabaseAdapterInterface {
   get: (soul: string) => Promise<DatabaseRecord>
   put: (soul: string, data: DatabaseRecord) => Promise<void>
   delete: (soul: string) => Promise<void>
+  getDocumentGrants: (documentSoul: string) => Promise<GrantRecord[]>
   close: () => void
 }
+
+type GrantKind = 'user' | 'group'
 
 interface DatabaseInterface {
   getUser: (id: string) => Promise<UserRecord | null>
@@ -213,12 +119,11 @@ interface DatabaseInterface {
   deleteMembership: (groupId: string, userId: string) => Promise<void>
   getDocument: (documentId: string) => Promise<DocumentRecord | null>
   putDocument: (document: DocumentRecord) => Promise<void>
+  getDocumentGrants: (documentId: string) => Promise<GrantRecord[]>
   deleteDocument: (documentId: string) => Promise<void>
-  getGrant: (docId: string, userOrGroupId: string) => Promise<GrantRecord | null>
+  getGrant: (docId: string, kind: GrantKind, id: string) => Promise<GrantRecord | null>
   putGrant: (grant: GrantRecord) => Promise<void>
-  deleteGrant: (docId: string, userOrGroupId: string) => Promise<void>
-  getHasAccess: (userId: string, documentId: string) => Promise<boolean>
-  getIsGroupAdmin: (groupId: string, userId: string) => Promise<boolean>
+  deleteGrant: (docId: string, kind: GrantKind, id: string) => Promise<void>
   close: () => void
 }
 
@@ -253,6 +158,7 @@ interface DeviceRecord {
 interface GroupRecord {
   // /groups/:groupId
   id: string
+  userId: string
   cryptPubKey: string
   encCryptPrivKey: string
 }
@@ -265,7 +171,6 @@ interface MembershipRecord {
   cryptTransformKey: string
 
   // Present for admins
-  encGroupSignPrivKey: string
   encGroupCryptPrivKey: string
 }
 
@@ -273,13 +178,14 @@ interface DocumentRecord {
   // /documents/:documentId
   id: string
   userId: string
-  encDecryptKey: string
+  encCryptPrivKey: string
 }
 
 interface GrantRecord {
   // /documents/:documentId/grants/:userOrGroupId
   documentId: string
-  userOrGroupId: string
+  id: string // either userId or grantId
+  kind: GrantKind
   encCryptPrivKey: string
 }
 
@@ -297,6 +203,8 @@ type NaturalRightsAction = Action<
   | DecryptDocumentAction
   | RevokeAccessAction
   | UpdateDocumentAction
+  | GetPubKeysAction
+  | GetKeyPairsAction
 >
 
 interface NaturalRightsRequest {
@@ -304,7 +212,6 @@ interface NaturalRightsRequest {
   deviceId: string
   signature: string
   body: string
-  actions: NaturalRightsAction[]
 }
 
 interface NaturalRightsResponse {
@@ -423,13 +330,15 @@ interface EncryptDocumentResult {
 
 interface GrantAccessAction {
   documentId: string
-  userId: string
+  kind: GrantKind
+  id: string
   encCryptPrivKey: string
 }
 
 interface GrantAccessResult {
   documentId: string
-  userId: string
+  kind: GrantKind
+  id: string
   encCryptPrivKey: string
 }
 
@@ -444,12 +353,14 @@ interface DecryptDocumentResult {
 
 interface RevokeAccessAction {
   documentId: string
-  userId: string
+  kind: GrantKind
+  id: string
 }
 
 interface RevokeAccessResult {
   documentId: string
-  userId: string
+  kind: GrantKind
+  id: string
 }
 
 interface UpdateDocumentAction {
@@ -461,5 +372,27 @@ interface UpdateDocumentAction {
 interface UpdateDocumentResult {
   documentId: string
   userId: string
+  encCryptPrivKey: string
+}
+
+interface GetPubKeysAction {
+  kind: GrantKind
+  id: string
+}
+
+interface GetPubKeysResult extends GetPubKeysAction {
+  signPubKey: string
+  cryptPubKey: string
+}
+
+interface GetKeyPairsAction {
+  kind: GrantKind
+  id: string
+}
+
+interface GetKeyPairsResult extends GetKeyPairsAction {
+  signPubKey: string
+  encSignPrivKey: string
+  cryptPubKey: string
   encCryptPrivKey: string
 }

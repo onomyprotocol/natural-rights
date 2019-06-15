@@ -1,14 +1,301 @@
-import DummyClass from "../src/natural-rights"
+import { HttpServer, LocalService, LmdbDatabaseAdapter } from '../src/natural-rights-server'
+import { Client, RemoteHttpService } from '../src/natural-rights-client'
+import { Primitives } from './DummyPrimitives'
 
-/**
- * Dummy test
- */
-describe("Dummy test", () => {
-  it("works if true is truthy", () => {
-    expect(true).toBeTruthy()
+const path = require('path')
+const rimraf = require('rimraf')
+const mkdirp = require('mkdirp')
+
+describe('Natural rights integration tests', () => {
+  const port = 4343
+  const testDirPath = path.resolve(__dirname, './integrationtestdata')
+  let adapter: LmdbDatabaseAdapter
+  let listener: any
+
+  async function connect(userId: string, deviceId: string) {
+    const deviceCryptKeyPair = await Primitives.cryptKeyGen()
+    const deviceSignKeyPair = await Primitives.signKeyGen()
+
+    return new Client(
+      new RemoteHttpService(Primitives, `http://localhost:${port}`),
+      userId,
+      deviceId,
+      deviceCryptKeyPair,
+      deviceSignKeyPair
+    )
+  }
+
+  beforeEach(async () => {
+    await new Promise((ok, fail) =>
+      rimraf(testDirPath, (err: any) => {
+        if (err) return fail(err)
+        mkdirp(testDirPath, (err: any) => (err ? fail(err) : ok()))
+      })
+    )
+    adapter = new LmdbDatabaseAdapter({
+      path: testDirPath
+    })
+    listener = new HttpServer(new LocalService(Primitives, adapter)).listen(port, '127.0.0.1')
   })
 
-  it("DummyClass is instantiable", () => {
-    expect(new DummyClass()).toBeInstanceOf(DummyClass)
+  afterEach(async () => {
+    if (listener) listener.close()
+    if (adapter) adapter.close()
+    await new Promise(ok => rimraf(testDirPath, ok))
+  })
+
+  describe('Proxy Re-Encryption Based Access Management', () => {
+    let alice: Client
+    let bob: Client
+    let carol: Client
+    let eve: Client
+
+    beforeEach(async () => {
+      try {
+        alice = await connect(
+          'alice',
+          'mainDevice'
+        )
+        await alice.initializeUser()
+
+        bob = await connect(
+          'bob',
+          'mainDevice'
+        )
+        await bob.initializeUser()
+
+        carol = await connect(
+          'carol',
+          'mainDevice'
+        )
+        await carol.initializeUser()
+
+        eve = await connect(
+          'eve',
+          'mainDevice'
+        )
+        await eve.initializeUser()
+      } catch (e) {
+        console.error(e.stack || e)
+        throw e
+      }
+    })
+
+    it('allows alice to grant bob access to a document', async () => {
+      const documentId = 'testDocumentId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.grantAccess(documentId, 'user', 'bob')
+
+      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+
+      let eveSuccess = false
+      try {
+        await eve.decryptDocument(documentId)
+        eveSuccess = true
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(eveSuccess).toEqual(false)
+    })
+
+    it("allows alice to revoke bob's access to her document", async () => {
+      const documentId = 'testDocumentId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.grantAccess(documentId, 'user', 'bob')
+
+      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      await alice.revokeAccess(documentId, 'user', 'bob')
+
+      let bobSuccess = false
+
+      try {
+        await bob.decryptDocument(documentId)
+        bobSuccess = true
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(bobSuccess).toEqual(false)
+    })
+
+    it('allows bob to grant carol access to a document he is given access to from alice', async () => {
+      const documentId = 'testDocumentId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.grantAccess(documentId, 'user', 'bob')
+      await bob.grantAccess(documentId, 'user', 'carol')
+
+      expect(await carol.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+
+      let eveSuccess = false
+      try {
+        await eve.decryptDocument(documentId)
+        eveSuccess = true
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(eveSuccess).toEqual(false)
+    })
+
+    it('allows alice to grant bob access to a document through a group', async () => {
+      const documentId = 'testDocumentId'
+      const groupId = 'testGroupId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.createGroup(groupId)
+      await alice.grantAccess(documentId, 'group', groupId)
+      await alice.addMemberToGroup(groupId, 'bob')
+
+      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+
+      let eveSuccess = false
+      try {
+        await eve.decryptDocument(documentId)
+        eveSuccess = true
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(eveSuccess).toEqual(false)
+    })
+
+    it('does not allow group members to add other members', async () => {
+      try {
+        const documentId = 'testDocumentId'
+        const groupId = 'testGroupId'
+        await alice.encryptDocument(documentId)
+        await alice.createGroup(groupId)
+        await alice.grantAccess(documentId, 'group', groupId)
+        await alice.addMemberToGroup(groupId, 'bob')
+
+        let bobSuccess = false
+        try {
+          await bob.addMemberToGroup(groupId, 'carol')
+          bobSuccess = true
+        } catch (e) {
+          expect(e).toEqual([
+            {
+              type: 'GetKeyPairs',
+              payload: {
+                id: groupId,
+                kind: 'group'
+              },
+              success: false,
+              error: 'Unauthorized'
+            }
+          ])
+        }
+        expect(bobSuccess).toEqual(false)
+      } catch (e) {
+        console.error(e.stack || e)
+        throw e
+      }
+    })
+
+    it("allows alice to revoke bob's membership in a group", async () => {
+      const documentId = 'testDocumentId'
+      const groupId = 'testGroupId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.createGroup(groupId)
+      await alice.grantAccess(documentId, 'group', groupId)
+      await alice.addMemberToGroup(groupId, 'bob')
+
+      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+
+      await alice.removeMemberFromGroup(groupId, 'bob')
+
+      let bobSuccess = false
+      try {
+        await bob.decryptDocument(documentId)
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(bobSuccess).toEqual(false)
+    })
+
+    it('allows alice to add bob as a group admin who can then add carol as a member', async () => {
+      const documentId = 'testDocumentId'
+      const groupId = 'testGroupId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.createGroup(groupId)
+      await alice.grantAccess(documentId, 'group', groupId)
+
+      await alice.addAdminToGroup(groupId, 'bob')
+      await bob.addMemberToGroup(groupId, 'carol')
+
+      expect(await carol.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+    })
+
+    it('allows alice to revoke a groups access to a document', async () => {
+      const documentId = 'testDocumentId'
+      const groupId = 'testGroupId'
+      const docCryptKeyPair = await alice.encryptDocument(documentId)
+      await alice.createGroup(groupId)
+      await alice.grantAccess(documentId, 'group', groupId)
+      await alice.addMemberToGroup(groupId, 'bob')
+
+      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+
+      await alice.revokeAccess(documentId, 'group', groupId)
+
+      let bobSuccess = false
+      try {
+        await bob.decryptDocument(documentId)
+        bobSuccess = true
+      } catch (e) {
+        expect(e).toEqual([
+          {
+            type: 'DecryptDocument',
+            payload: {
+              documentId
+            },
+            success: false,
+            error: 'Unauthorized'
+          }
+        ])
+      }
+      expect(bobSuccess).toEqual(false)
+    })
   })
 })
