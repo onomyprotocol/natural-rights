@@ -9,12 +9,6 @@
   "files": [
     "dist"
   ],
-  "author": " <>",
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "license": "MIT",
   "engines": {
     "node": ">=6.0.0"
   },
@@ -116,5 +110,8 @@
     "tslint-config-standard": "^8.0.1",
     "typedoc": "^0.14.2",
     "typescript": "^3.5.1"
+  },
+  "dependencies": {
+    "node-lmdb": "^0.6.2"
   }
 }
