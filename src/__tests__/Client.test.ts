@@ -163,10 +163,15 @@ describe('Client', () => {
     })
 
     it('makes a request including userId, public keys and encrypted private keys', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, '', deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
+      const userSignKeyPair = {
+        pubKey: 'userSignPubKey',
+        privKey: 'userSignPrivKey'
+      }
+      service.primitives.signKeyGen = jest.fn().mockResolvedValue(userSignKeyPair)
 
       await client.initializeUser()
 
@@ -176,9 +181,8 @@ describe('Client', () => {
           payload: {
             cryptPubKey: 'cryptPubKey',
             encCryptPrivKey: 'encrypted:cryptPubKey:cryptPrivKey',
-            encSignPrivKey: 'encrypted:cryptPubKey:signPrivKey',
-            signPubKey: 'signPubKey',
-            userId
+            encSignPrivKey: `encrypted:cryptPubKey:${userSignKeyPair.privKey}`,
+            userId: userSignKeyPair.pubKey
           }
         },
         {
@@ -188,7 +192,7 @@ describe('Client', () => {
             signPubKey: 'deviceSignPubKey',
             cryptTransformKey: 'transform:cryptPrivKey:deviceCryptPubKey',
             deviceId,
-            userId
+            userId: userSignKeyPair.pubKey
           }
         }
       ])
@@ -201,7 +205,7 @@ describe('Client', () => {
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
-      client.getCryptKeyPair = jest.fn().mockResolvedValue(userCryptKeyPair)
+      client.getEncryptionKeyPair = jest.fn().mockResolvedValue(userCryptKeyPair)
 
       const newDeviceId = 'newDeviceId'
 
@@ -246,41 +250,44 @@ describe('Client', () => {
   describe('createGroup', () => {
     it('uses KeyGen to generate encryption key pair', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
-      const groupId = 'testgroupid'
       const userPubKey = 'userEncPubKey'
-      client.getCryptPubKey = jest.fn().mockResolvedValue(userPubKey)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
 
-      await client.createGroup(groupId)
+      await client.createGroup()
       expect(service.primitives.cryptKeyGen).toHaveBeenCalled()
     })
 
     it('encrypts private key to owning user pub key', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
-      const groupId = 'testgroupid'
       const userPubKey = 'userEncPubKey'
-      client.getCryptPubKey = jest.fn().mockResolvedValue(userPubKey)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
 
-      await client.createGroup(groupId)
+      await client.createGroup()
       expect(service.primitives.encrypt).toHaveBeenCalledWith(userPubKey, 'cryptPrivKey')
     })
 
     it('makes a request with publicKey, userId, encryptedPrivateKey', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
-      const groupId = 'testgroupid'
       const userPubKey = 'userCryptPubKey'
-      client.getCryptPubKey = jest.fn().mockResolvedValue(userPubKey)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
+      const expectedSignKeyPair = {
+        privKey: 'groupSignPrivKey',
+        pubKey: 'groupSignPubKey'
+      }
+      client.service.primitives.signKeyGen = jest.fn().mockResolvedValue(expectedSignKeyPair)
 
-      await client.createGroup(groupId)
-      expect(client.getCryptPubKey).toHaveBeenCalledWith('user', userId)
+      const groupId = await client.createGroup()
+      expect(client.getEncryptionPublicKey).toHaveBeenCalledWith('user', userId)
       expect(client.request).toHaveBeenCalledWith([
         {
           type: 'CreateGroup',
           payload: {
             cryptPubKey: 'cryptPubKey',
             encCryptPrivKey: 'encrypted:userCryptPubKey:cryptPrivKey',
+            encSignPrivKey: `encrypted:${userPubKey}:${expectedSignKeyPair.privKey}`,
             groupId,
             userId
           }
@@ -305,7 +312,7 @@ describe('Client', () => {
     })
   })
 
-  describe('addMemberToGroup', () => {
+  describe('addReaderToGroup', () => {
     it('uses cryptTransformKeyGen for Group->Member to build cryptTransformKey', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const groupId = 'testgroupid'
@@ -315,16 +322,16 @@ describe('Client', () => {
         privKey: 'groupCryptPrivKey',
         pubKey: 'groupCryptPubKey'
       }
-      client.getCryptPubKey = jest.fn().mockResolvedValue(memberPubKey)
-      client.getCryptKeyPair = jest.fn().mockResolvedValue(groupCryptKeyPair)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(memberPubKey)
+      client.getEncryptionKeyPair = jest.fn().mockResolvedValue(groupCryptKeyPair)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
 
-      await client.addMemberToGroup(groupId, memberId)
+      await client.addReaderToGroup(groupId, memberId)
 
-      expect(client.getCryptPubKey).toHaveBeenCalledWith('user', memberId)
-      expect(client.getCryptKeyPair).toHaveBeenCalledWith('group', groupId)
+      expect(client.getEncryptionPublicKey).toHaveBeenCalledWith('user', memberId)
+      expect(client.getEncryptionKeyPair).toHaveBeenCalledWith('group', groupId)
       expect(client.service.primitives.cryptTransformKeyGen).toHaveBeenCalledWith(
         groupCryptKeyPair,
         memberPubKey
@@ -363,6 +370,10 @@ describe('Client', () => {
         }
       ])
     })
+
+    describe('when removing a member referenced as signTransformParentUserId for other users', () => {
+      it.todo('includes AddMemberToGroup for each affected membership to maintain write access')
+    })
   })
 
   describe('addAdminToGroup', () => {
@@ -373,8 +384,8 @@ describe('Client', () => {
         privKey: 'groupCryptPrivKey',
         pubKey: 'groupCryptPubKey'
       }
-      client.getCryptPubKey = jest.fn().mockResolvedValue(memberPubKey)
-      client.getCryptKeyPair = jest.fn().mockResolvedValue(groupCryptKeyPair)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(memberPubKey)
+      client.getEncryptionKeyPair = jest.fn().mockResolvedValue(groupCryptKeyPair)
       const toAddId = 'addMemberId'
       const groupId = 'groupId'
       client.request = jest.fn().mockResolvedValue({
@@ -383,8 +394,8 @@ describe('Client', () => {
 
       await client.addAdminToGroup(groupId, toAddId)
 
-      expect(client.getCryptPubKey).toHaveBeenCalledWith('user', toAddId)
-      expect(client.getCryptKeyPair).toHaveBeenCalledWith('group', groupId)
+      expect(client.getEncryptionPublicKey).toHaveBeenCalledWith('user', toAddId)
+      expect(client.getEncryptionKeyPair).toHaveBeenCalledWith('group', groupId)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
         memberPubKey,
         groupCryptKeyPair.privKey
@@ -438,43 +449,54 @@ describe('Client', () => {
     })
   })
 
-  describe('encryptDocument', () => {
+  describe('createDocument', () => {
     it('generates an encryption keypair and registers it with service', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userPubKey'
-      const documentId = 'testdocumentid'
       const expectedCryptKeyPair = {
         privKey: 'cryptPrivKey',
         pubKey: 'cryptPubKey'
       }
-      client.getCryptPubKey = jest.fn().mockResolvedValue(userPubKey)
+      const expectedSignKeyPair = {
+        privKey: 'docSignPrivKey',
+        pubKey: 'docSignPubKey'
+      }
+      const documentId = expectedSignKeyPair.pubKey
+      client.service.primitives.signKeyGen = jest.fn().mockResolvedValue(expectedSignKeyPair)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
 
-      const docCryptKeyPair = await client.encryptDocument(documentId)
+      const doc = await client.createDocument()
 
       expect(client.service.primitives.cryptKeyGen).toHaveBeenCalled()
-      expect(docCryptKeyPair).toEqual(expectedCryptKeyPair)
+      expect(client.service.primitives.signKeyGen).toHaveBeenCalled()
+      expect(doc.cryptKeyPair).toEqual(expectedCryptKeyPair)
+      expect(doc.signKeyPair).toEqual(expectedSignKeyPair)
+      expect(doc.id).toEqual(documentId)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
         userPubKey,
-        docCryptKeyPair.privKey
+        expectedCryptKeyPair.privKey
       )
 
       expect(client.request).toHaveBeenCalledWith([
         {
           type: 'EncryptDocument',
           payload: {
-            encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey',
             documentId,
-            userId
+            cryptUserId: userId,
+            signUserId: userId,
+
+            encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey',
+            encSignPrivKey: `encrypted:${userPubKey}:${expectedSignKeyPair.privKey}`
           }
         }
       ])
     })
   })
 
-  describe('grantAccess', () => {
+  describe('grantReadAccess', () => {
     it('makes a request including documentId, encrypted decryption key and userId or groupId', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const documentId = 'testDocumentId'
@@ -482,16 +504,16 @@ describe('Client', () => {
       const granteeKind = 'user'
       const granteePubKey = 'granteePubKey'
       const docCryptPrivKey = 'decryptedDocumentCryptPrivKey'
-      client.getCryptPubKey = jest.fn().mockResolvedValue(granteePubKey)
-      client.decryptDocument = jest.fn().mockResolvedValue(docCryptPrivKey)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(granteePubKey)
+      client.decryptDocumentEncryptionKey = jest.fn().mockResolvedValue(docCryptPrivKey)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
 
-      await client.grantAccess(documentId, granteeKind, granteeId)
+      await client.grantReadAccess(documentId, granteeKind, granteeId)
 
-      expect(client.getCryptPubKey).toHaveBeenCalledWith(granteeKind, granteeId)
-      expect(client.decryptDocument).toHaveBeenCalledWith(documentId)
+      expect(client.getEncryptionPublicKey).toHaveBeenCalledWith(granteeKind, granteeId)
+      expect(client.decryptDocumentEncryptionKey).toHaveBeenCalledWith(documentId)
       expect(service.primitives.encrypt).toHaveBeenCalledWith(granteePubKey, docCryptPrivKey)
 
       expect(client.request).toHaveBeenCalledWith([
@@ -508,7 +530,7 @@ describe('Client', () => {
     })
   })
 
-  describe('decryptDocument', () => {
+  describe('decryptDocumentKey', () => {
     it('makes a request including documentId', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const documentId = 'testDocumentId'
@@ -528,7 +550,7 @@ describe('Client', () => {
         ]
       })
 
-      const documentCryptPrivKey = await client.decryptDocument(documentId)
+      const documentCryptPrivKey = await client.decryptDocumentEncryptionKey(documentId)
 
       expect(client.request).toHaveBeenCalledWith([
         {
@@ -550,7 +572,7 @@ describe('Client', () => {
 
       let success = false
       try {
-        await client.decryptDocument(documentId)
+        await client.decryptDocumentEncryptionKey(documentId)
         success = true
       } catch (e) {
         expect(e).toEqual(new Error('No DecryptDocument result'))
@@ -581,6 +603,10 @@ describe('Client', () => {
         }
       ])
     })
+
+    describe('when revoking access for a user referenced  as signTransformParentUserId for other users', () => {
+      it.todo('includes GrantAccess for each affected grant to maintain write access')
+    })
   })
 
   describe('updateDocument', () => {
@@ -592,7 +618,7 @@ describe('Client', () => {
         privKey: 'cryptPrivKey',
         pubKey: 'cryptPubKey'
       }
-      client.getCryptPubKey = jest.fn().mockResolvedValue(userPubKey)
+      client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
@@ -612,14 +638,15 @@ describe('Client', () => {
           payload: {
             encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey',
             documentId,
-            userId
+            cryptUserId: userId,
+            cryptPubKey: expectedCryptKeyPair.pubKey
           }
         }
       ])
     })
   })
 
-  describe('getPubKeys', () => {
+  describe('getPublicKeys', () => {
     it('makes a request asking for public keys', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
@@ -646,7 +673,7 @@ describe('Client', () => {
         ]
       })
 
-      expect(await client.getPubKeys('user', testUserId)).toEqual({
+      expect(await client.getPublicKeys('user', testUserId)).toEqual({
         ...payload,
         cryptPubKey,
         signPubKey
@@ -658,7 +685,7 @@ describe('Client', () => {
 
       let success = false
       try {
-        await client.getPubKeys('user', testUserId)
+        await client.getPublicKeys('user', testUserId)
         success = true
       } catch (e) {
         expect(e).toEqual(new Error('No GetPubKeys result'))
@@ -723,7 +750,7 @@ describe('Client', () => {
     })
   })
 
-  describe('getCryptPubKey', () => {
+  describe('getEncryptionPublicKey', () => {
     it('resolves encryption public key if available', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
@@ -735,13 +762,17 @@ describe('Client', () => {
         signPubKey
       }
 
-      client.getPubKeys = jest.fn().mockResolvedValue(pubKeys)
-      expect(await client.getCryptPubKey('user', testUserId)).toEqual(cryptPubKey)
-      expect(client.getPubKeys).toBeCalledWith('user', testUserId)
+      client.getPublicKeys = jest.fn().mockResolvedValue(pubKeys)
+      expect(await client.getEncryptionPublicKey('user', testUserId)).toEqual(cryptPubKey)
+      expect(client.getPublicKeys).toBeCalledWith('user', testUserId)
     })
   })
 
-  describe('getCryptKeyPair', () => {
+  describe('getSignaturePublicKey', () => {
+    it.todo('resolves signature public key if available')
+  })
+
+  describe('getEncryptionKeyPair', () => {
     it('resolves encryption key pair if available', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
@@ -761,12 +792,61 @@ describe('Client', () => {
       client.getKeyPairs = jest.fn().mockResolvedValue(keyPairs)
       service.primitives.decrypt = jest.fn().mockResolvedValue(decryptedKey)
 
-      expect(await client.getCryptKeyPair('user', testUserId)).toEqual({
+      expect(await client.getEncryptionKeyPair('user', testUserId)).toEqual({
         pubKey: cryptPubKey,
         privKey: decryptedKey
       })
       expect(client.getKeyPairs).toBeCalledWith('user', testUserId)
       expect(service.primitives.decrypt).toBeCalledWith(deviceCryptKeyPair, encCryptPrivKey)
     })
+  })
+
+  describe('getSignKeyPair', () => {
+    it.todo('resolves signature key pair if available')
+  })
+
+  describe('grantWriteAccess', () => {
+    it.todo('requests document info')
+    describe('if document owned by requester', () => {
+      it.todo('requests and decrypts document signPrivKey')
+      it.todo('executes signTransformKeyGen for document <- grantee')
+    })
+
+    describe('if requester is granted access to document', () => {
+      it.todo('requests and decrypts requester grant signPrivKey')
+      it.todo('executes signTransformKeyGen for requester grant <- grantee')
+      it.todo('makes a request registering signTransformKey, granter and grantee')
+    })
+  })
+
+  describe('encryptTextDocument', () => {
+    it.todo('generates encryption key pair')
+    it.todo('encrypts document with encryption key pair')
+    it.todo('fetches document grants')
+
+    describe('if document exists', () => {
+      it.todo('encrypts cryptPrivKeys for each grant')
+
+      describe('if owned by requester', () => {
+        it.todo('signs encrypted document with encSignPrivKey if owned')
+      })
+
+      describe('if requster is granted write access to document', () => {
+        it.todo('signs encrypte ddocument as device and requests resignature as document')
+      })
+
+      it.todo("requests UpdateDocument and appropriate GrantAccess's")
+    })
+
+    describe('if document does not exist', () => {
+      it.todo('generates signing key pair and signs encrypted document')
+      it.todo('requests CreateDocument with pub keys and encrypted priv keys')
+    })
+  })
+
+  describe('decryptTextDocument', () => {
+    it.todo('decrypts document key')
+    it.todo('uses decrypted document key to decrypt ciphertext')
+    it.todo('resolves plaintext')
   })
 })

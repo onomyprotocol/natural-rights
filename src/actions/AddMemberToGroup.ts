@@ -18,6 +18,11 @@ export class AddMemberToGroup extends ActionHandler {
       groupId: this.payload.groupId,
       userId: this.payload.userId,
       cryptTransformKey: this.payload.cryptTransformKey,
+
+      signPubKey: this.payload.signPubKey,
+      encSignPrivKey: this.payload.encSignPrivKey,
+      signTransformToUserId: this.payload.signTransformToUserId,
+      signTransformKey: this.payload.signTransformKey,
       encGroupCryptPrivKey: ''
     })
     return this.payload as AddMemberToGroupResult

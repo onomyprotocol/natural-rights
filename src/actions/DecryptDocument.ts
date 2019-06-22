@@ -10,11 +10,11 @@ export class DecryptDocument extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return service.getHasAccess(this.userId, this.payload.documentId)
+    return service.getHasReadAccess(this.userId, this.payload.documentId)
   }
 
   async execute(service: LocalService) {
-    const encCryptPrivKey = await service.getDeviceEncryptedDocumentKey(
+    const encCryptPrivKey = await service.getDeviceDocumentDecryptKey(
       this.userId,
       this.deviceId,
       this.payload.documentId

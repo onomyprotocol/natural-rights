@@ -10,15 +10,23 @@ export class GrantAccess extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return service.getHasAccess(this.userId, this.payload.documentId)
+    return service.getHasReadAccess(this.userId, this.payload.documentId)
   }
 
   async execute(service: LocalService) {
+    const existing = await service.db.getGrant(
+      this.payload.documentId,
+      this.payload.kind,
+      this.payload.id
+    )
     await service.db.putGrant({
-      documentId: this.payload.documentId,
-      kind: this.payload.kind,
-      id: this.payload.id,
-      encCryptPrivKey: this.payload.encCryptPrivKey
+      signPubKey: '',
+      encSignPrivKey: '',
+      signTransformToKind: 'user',
+      signTransformToId: '',
+      signTransformKey: '',
+      ...existing,
+      ...this.payload
     })
     return this.payload as GrantAccessResult
   }

@@ -31,6 +31,7 @@ describe('LmdbDatabaseAdapter', () => {
     const record = {
       id: 'documentId',
       userId: 'userId',
+      cryptPubKey: 'cryptPubKey',
       encCryptPrivKey: 'encCryptPrivKey'
     }
     const soul = 'testsoul'
@@ -58,6 +59,7 @@ describe('LmdbDatabaseAdapter', () => {
       const record = {
         id: 'documentId',
         userId: 'userId',
+        cryptPubKey: 'cryptPubKey',
         encCryptPrivKey: 'encCryptPrivKey'
       }
 
@@ -77,12 +79,16 @@ describe('LmdbDatabaseAdapter', () => {
       const document = {
         id: documentId,
         userId: 'testUserId',
+        cryptPubKey: 'cryptPubKey',
+
         encCryptPrivKey: 'doesntmatter'
       }
 
       const someOtherDoc = {
         id: 'someOtherDoc',
         userId: 'testUserId',
+        cryptPubKey: 'cryptPubKey',
+
         encCryptPrivKey: 'doesntmatter'
       }
 

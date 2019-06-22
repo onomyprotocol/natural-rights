@@ -11,16 +11,31 @@ interface ClientInterface {
     deviceCryptKeyPair: KeyPair
   }>
   removeDevice: (deviceId: string) => Promise<void>
-  createGroup: (groupId: string) => Promise<void>
-  addMemberToGroup: (groupId: string, userId: string) => Promise<void>
-  removeMemberFromGroup: (groupId: string, userId: string) => Promise<void>
+
+  createGroup: () => Promise<string>
   addAdminToGroup: (groupId: string, userId: string) => Promise<void>
   removeAdminFromGroup: (groupId: string, userId: string) => Promise<void>
-  encryptDocument: (documentId: string) => Promise<KeyPair>
-  grantAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
-  decryptDocument: (documentId: string) => Promise<string>
+  addReaderToGroup: (groupId: string, userId: string) => Promise<void>
+  addWriterToGroup?: (groupId: string, userId: string) => Promise<void>
+  removeMemberFromGroup: (groupId: string, userId: string) => Promise<void>
+
+  grantReadAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
+  grantWriteAccess?: (documentId: string, kind: GrantKind, id: string) => Promise<void>
   revokeAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
-  updateDocument: (documentId: string) => Promise<KeyPair>
+
+  encryptDocumentText?: (params: {
+    documentId?: string
+    plaintext: string
+  }) => Promise<{
+    documentId: string
+    cryptPubKey: string
+    ciphertext: string
+    signature: string
+  }>
+
+  decryptDocumentText?: (documentId: string, ciphertext: string) => Promise<string>
+
+  decryptDocumentEncryptionKey: (documentId: string) => Promise<string>
 }
 
 interface KeyPair {
@@ -30,12 +45,14 @@ interface KeyPair {
 
 interface PrimitivesInterface {
   cryptKeyGen: () => Promise<KeyPair>
-  signKeyGen: () => Promise<KeyPair>
   cryptTransformKeyGen: (fromKeyPair: KeyPair, toPubKey: string) => Promise<string>
+  signKeyGen: () => Promise<KeyPair>
+  signTransformKeyGen?: (fromKeyPair: KeyPair, toPubKey: string) => Promise<string>
   encrypt: (pubKey: string, plaintext: string) => Promise<string>
   cryptTransform: (transformKey: string, ciphertext: string) => Promise<string>
   decrypt: (keyPair: KeyPair, ciphertext: string) => Promise<string>
   sign: (keyPair: KeyPair, text: string) => Promise<string>
+  signTransform?: (transformKey: string, signature: string) => Promise<string>
   verify: (pubKey: string, signature: string, text: string) => Promise<boolean>
 }
 
@@ -103,6 +120,7 @@ interface DatabaseAdapterInterface {
 }
 
 type GrantKind = 'user' | 'group'
+type SignatureKind = 'user' | 'group' | 'document'
 
 interface DatabaseInterface {
   getUser: (id: string) => Promise<UserRecord | null>
@@ -139,7 +157,6 @@ type DatabaseRecord =
 interface UserRecord {
   // /users/:userId
   id: string
-  signPubKey: string
   cryptPubKey: string
   encCryptPrivKey: string
   encSignPrivKey: string
@@ -157,10 +174,12 @@ interface DeviceRecord {
 
 interface GroupRecord {
   // /groups/:groupId
-  id: string
+  id: string // is signPubKey
   userId: string
   cryptPubKey: string
   encCryptPrivKey: string
+
+  encSignPrivKey: string
 }
 
 interface MembershipRecord {
@@ -170,23 +189,41 @@ interface MembershipRecord {
 
   cryptTransformKey: string
 
+  // Present for those with write access
+  signPubKey: string
+  encSignPrivKey: string
+  signTransformToUserId: string
+  signTransformKey: string
+
   // Present for admins
   encGroupCryptPrivKey: string
 }
 
 interface DocumentRecord {
   // /documents/:documentId
-  id: string
-  userId: string
+  id: string // is signPubKey
+
+  cryptUserId: string
+  cryptPubKey: string
   encCryptPrivKey: string
+
+  signUserId: string
+  encSignPrivKey: string // encrypted to userId
 }
 
 interface GrantRecord {
-  // /documents/:documentId/grants/:userOrGroupId
+  // /documents/:documentId/grants/:kind/:id
   documentId: string
   id: string // either userId or grantId
   kind: GrantKind
   encCryptPrivKey: string
+
+  // Present for those with write access
+  signPubKey: string
+  encSignPrivKey: string
+  signTransformToKind: GrantKind
+  signTransformToId: string
+  signTransformKey: string
 }
 
 type NaturalRightsAction = Action<
@@ -221,18 +258,11 @@ interface NaturalRightsResponse {
 interface InitializeUserAction {
   userId: string
   cryptPubKey: string
-  signPubKey: string
   encCryptPrivKey: string
   encSignPrivKey: string
 }
 
-interface InitializeUserResult {
-  userId: string
-  cryptPubKey: string
-  signPubKey: string
-  encCryptPrivKey: string
-  encSignPrivKey: string
-}
+interface InitializeUserResult extends InitializeUserAction {}
 
 interface AddDeviceAction {
   deviceId: string
@@ -254,34 +284,35 @@ interface RemoveDeviceAction {
   userId: string
 }
 
-interface RemoveDeviceResult {
-  deviceId: string
-  userId: string
-}
+interface RemoveDeviceResult extends RemoveDeviceAction {}
 
 interface CreateGroupAction {
   groupId: string
   userId: string
   cryptPubKey: string
   encCryptPrivKey: string
+  encSignPrivKey: string
 }
 
-interface CreateGroupResult {
-  groupId: string
-  userId: string
-  cryptPubKey: string
-  encCryptPrivKey: string
-}
+interface CreateGroupResult extends CreateGroupAction {}
 
 interface AddMemberToGroupAction {
   groupId: string
   userId: string
   cryptTransformKey: string
+
+  signPubKey: string
+  encSignPrivKey: string
+  signTransformToUserId: string
+  signTransformKey: string
 }
 
 interface AddMemberToGroupResult {
   groupId: string
   userId: string
+
+  signPubKey: string
+  signTransformToUserId: string
 }
 
 interface RemoveMemberFromGroupAction {
@@ -289,10 +320,7 @@ interface RemoveMemberFromGroupAction {
   userId: string
 }
 
-interface RemoveMemberFromGroupResult {
-  groupId: string
-  userId: string
-}
+interface RemoveMemberFromGroupResult extends RemoveAdminFromGroupAction {}
 
 interface AddAdminToGroupAction {
   groupId: string
@@ -300,54 +328,47 @@ interface AddAdminToGroupAction {
   encCryptPrivKey: string
 }
 
-interface AddAdminToGroupResult {
-  groupId: string
-  userId: string
-  encCryptPrivKey: string
-}
+interface AddAdminToGroupResult extends AddAdminToGroupAction {}
 
 interface RemoveAdminFromGroupAction {
   groupId: string
   userId: string
 }
 
-interface RemoveAdminFromGroupResult {
-  groupId: string
-  userId: string
-}
+interface RemoveAdminFromGroupResult extends RemoveAdminFromGroupAction {}
 
 interface EncryptDocumentAction {
-  documentId: string
-  userId: string
+  documentId: string // is also signPubKey
+  cryptUserId: string
+  cryptPubKey: string
+
+  signUserId: string
   encCryptPrivKey: string
+  encSignPrivKey: string
 }
 
-interface EncryptDocumentResult {
-  documentId: string
-  userId: string
-  encCryptPrivKey: string
-}
+interface EncryptDocumentResult extends EncryptDocumentAction {}
 
 interface GrantAccessAction {
   documentId: string
   kind: GrantKind
   id: string
   encCryptPrivKey: string
+
+  signPubKey?: string
+  encSignPrivKey?: string
+  signTransformToKind?: GrantKind
+  signTransformToId?: string
+  signTransformKey?: string
 }
 
-interface GrantAccessResult {
-  documentId: string
-  kind: GrantKind
-  id: string
-  encCryptPrivKey: string
-}
+interface GrantAccessResult extends GrantAccessAction {}
 
 interface DecryptDocumentAction {
   documentId: string
 }
 
-interface DecryptDocumentResult {
-  documentId: string
+interface DecryptDocumentResult extends DecryptDocumentAction {
   encCryptPrivKey: string
 }
 
@@ -357,23 +378,16 @@ interface RevokeAccessAction {
   id: string
 }
 
-interface RevokeAccessResult {
-  documentId: string
-  kind: GrantKind
-  id: string
-}
+interface RevokeAccessResult extends RevokeAccessAction {}
 
 interface UpdateDocumentAction {
   documentId: string
-  userId: string
+  cryptUserId: string
+  cryptPubKey: string
   encCryptPrivKey: string
 }
 
-interface UpdateDocumentResult {
-  documentId: string
-  userId: string
-  encCryptPrivKey: string
-}
+interface UpdateDocumentResult extends UpdateDocumentAction {}
 
 interface GetPubKeysAction {
   kind: GrantKind

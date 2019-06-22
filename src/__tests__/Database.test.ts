@@ -178,19 +178,23 @@ describe('Database', () => {
   })
 
   describe('Membership', () => {
+    const userId = 'testuserid'
+    const groupId = 'testgroupid'
+    const expectedSoul = Souls.membership(groupId, userId)
+    const membershipRecord: MembershipRecord = {
+      groupId,
+      userId,
+      cryptTransformKey: '',
+      signPubKey: '',
+      encSignPrivKey: '',
+      signTransformToUserId: '',
+      signTransformKey: '',
+      encGroupCryptPrivKey: ''
+    }
+
     describe('getMembership', () => {
       it('resolves membership record for group/user if present', async () => {
-        const userId = 'testuserid'
-        const groupId = 'testgroupid'
-        const expectedSoul = Souls.membership(groupId, userId)
-        const membershipRecord: MembershipRecord = {
-          groupId,
-          userId,
-          cryptTransformKey: '',
-          encGroupCryptPrivKey: ''
-        }
         dbAdapter.get = jest.fn().mockResolvedValue(membershipRecord)
-
         const result = await db.getMembership(groupId, userId)
         expect(dbAdapter.get).toBeCalledWith(expectedSoul)
         expect(result).toEqual(membershipRecord)
@@ -199,17 +203,6 @@ describe('Database', () => {
 
     describe('putMembership', () => {
       it('persists a membership record via the adapter', async () => {
-        const userId = 'testuserid'
-        const groupId = 'testgroupid'
-        const expectedSoul = Souls.membership(groupId, userId)
-
-        const membershipRecord: MembershipRecord = {
-          groupId,
-          userId,
-          cryptTransformKey: '',
-          encGroupCryptPrivKey: ''
-        }
-
         await db.putMembership(membershipRecord)
         expect(dbAdapter.put).toBeCalledWith(expectedSoul, membershipRecord)
       })
@@ -228,17 +221,20 @@ describe('Database', () => {
   })
 
   describe('Document', () => {
+    const documentId = 'testdocumentid'
+    const expectedSoul = Souls.document(documentId)
+    const documentRecord: DocumentRecord = {
+      id: documentId,
+      cryptUserId: '',
+      cryptPubKey: '',
+      encCryptPrivKey: '',
+      signUserId: '',
+      encSignPrivKey: ''
+    }
+
     describe('getDocument', () => {
       it('resolves document record for given id when present', async () => {
-        const documentId = 'testdocumentid'
-        const expectedSoul = Souls.document(documentId)
-        const documentRecord: DocumentRecord = {
-          id: documentId,
-          userId: '',
-          encCryptPrivKey: ''
-        }
         dbAdapter.get = jest.fn().mockResolvedValue(documentRecord)
-
         const result = await db.getDocument(documentId)
         expect(dbAdapter.get).toBeCalledWith(expectedSoul)
         expect(result).toEqual(documentRecord)
@@ -247,14 +243,6 @@ describe('Database', () => {
 
     describe('putDocument', () => {
       it('persists a document record via the adapter', async () => {
-        const documentId = 'testdocumentid'
-        const expectedSoul = Souls.document(documentId)
-        const documentRecord: DocumentRecord = {
-          id: documentId,
-          userId: '',
-          encCryptPrivKey: ''
-        }
-
         await db.putDocument(documentRecord)
         expect(dbAdapter.put).toBeCalledWith(expectedSoul, documentRecord)
       })
@@ -262,9 +250,6 @@ describe('Database', () => {
 
     describe('deleteDocument', () => {
       it('deletes a document record', async () => {
-        const documentId = 'testdocumentid'
-        const expectedSoul = Souls.document(documentId)
-
         await db.deleteDocument(documentId)
         expect(dbAdapter.delete).toBeCalledWith(expectedSoul)
       })
@@ -272,18 +257,24 @@ describe('Database', () => {
   })
 
   describe('Grant', () => {
+    const documentId = 'testdocumentid'
+    const userId = 'testuserid'
+    const expectedSoul = Souls.grant(documentId, 'user', userId)
+    const grantRecord: GrantRecord = {
+      documentId,
+      id: userId,
+      kind: 'user',
+      encCryptPrivKey: '',
+
+      signPubKey: '',
+      encSignPrivKey: '',
+      signTransformKey: '',
+      signTransformToKind: 'user',
+      signTransformToId: ''
+    }
+
     describe('getGrant', () => {
       it('resolves grant record when present', async () => {
-        const documentId = 'testdocumentid'
-        const userId = 'testuserid'
-        const expectedSoul = Souls.grant(documentId, 'user', userId)
-        const grantRecord: GrantRecord = {
-          documentId,
-          id: userId,
-          kind: 'user',
-          encCryptPrivKey: ''
-        }
-
         expect(await db.getGrant(documentId, 'user', userId)).toEqual(null)
         dbAdapter.get = jest.fn().mockResolvedValue(grantRecord)
 
@@ -295,15 +286,6 @@ describe('Database', () => {
 
     describe('putGrant', () => {
       it('persists a grant record', async () => {
-        const documentId = 'testdocumentid'
-        const userId = 'testuserid'
-        const expectedSoul = Souls.grant(documentId, 'user', userId)
-        const grantRecord: GrantRecord = {
-          documentId,
-          id: userId,
-          kind: 'user',
-          encCryptPrivKey: ''
-        }
         dbAdapter.get = jest.fn().mockResolvedValue(grantRecord)
 
         await db.putGrant(grantRecord)

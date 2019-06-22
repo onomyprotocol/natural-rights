@@ -438,7 +438,7 @@ describe('LocalService', () => {
       const userId = 'testUserId'
       const documentId = 'testDocumentId'
       const document = {
-        userId,
+        cryptUserId: userId,
         documentId,
         encCryptPrivKey: 'docEncCryptPrivKey'
       }
@@ -522,13 +522,13 @@ describe('LocalService', () => {
     })
   })
 
-  describe('getUserEncryptedDocumentKey', () => {
+  describe('getUserDocumentDecryptKey', () => {
     it("resolves '' if user has no access to document", async () => {
       const userId = 'testUserId'
       const documentId = 'testDocumentId'
       service.getCredentials = jest.fn().mockResolvedValue(undefined)
 
-      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual('')
+      expect(await service.getUserDocumentDecryptKey(userId, documentId)).toEqual('')
       expect(service.getCredentials).toBeCalledWith(userId, documentId)
     })
 
@@ -538,7 +538,7 @@ describe('LocalService', () => {
       const document = { encCryptPrivKey: 'docEncCryptPrivKey' }
       service.getCredentials = jest.fn().mockResolvedValue({ document })
 
-      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(
+      expect(await service.getUserDocumentDecryptKey(userId, documentId)).toEqual(
         document.encCryptPrivKey
       )
       expect(service.getCredentials).toBeCalledWith(userId, documentId)
@@ -551,7 +551,7 @@ describe('LocalService', () => {
       const grant = { encCryptPrivKey: 'grantEncCryptPrivKey' }
       service.getCredentials = jest.fn().mockResolvedValue({ document, grant })
 
-      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(
+      expect(await service.getUserDocumentDecryptKey(userId, documentId)).toEqual(
         grant.encCryptPrivKey
       )
       expect(service.getCredentials).toBeCalledWith(userId, documentId)
@@ -570,7 +570,7 @@ describe('LocalService', () => {
       service.getCredentials = jest.fn().mockResolvedValue({ document, grant, membership })
       primitives.cryptTransform = jest.fn().mockResolvedValue(transformedKey)
 
-      expect(await service.getUserEncryptedDocumentKey(userId, documentId)).toEqual(transformedKey)
+      expect(await service.getUserDocumentDecryptKey(userId, documentId)).toEqual(transformedKey)
       expect(service.getCredentials).toBeCalledWith(userId, documentId)
       expect(primitives.cryptTransform).toBeCalledWith(
         membership.cryptTransformKey,
@@ -579,15 +579,15 @@ describe('LocalService', () => {
     })
   })
 
-  describe('getDeviceEncryptedDocumentKey', () => {
+  describe('getDeviceDocumentDecryptKey', () => {
     it("resolves '' if the device does not exist", async () => {
       const userId = 'testUserId'
       const deviceId = 'testDeviceId'
       const documentId = 'testDocumentId'
       db.getDevice = jest.fn().mockResolvedValue(null)
-      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue('letspretendthisexists')
+      service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue('letspretendthisexists')
 
-      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual('')
+      expect(await service.getDeviceDocumentDecryptKey(userId, deviceId, documentId)).toEqual('')
       expect(db.getDevice).toBeCalledWith(userId, deviceId)
     })
 
@@ -600,9 +600,9 @@ describe('LocalService', () => {
         userId,
         cryptTransformKey: 'deviceCryptTransformKey'
       } as DeviceRecord)
-      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue('')
+      service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue('')
 
-      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual('')
+      expect(await service.getDeviceDocumentDecryptKey(userId, deviceId, documentId)).toEqual('')
       expect(db.getDevice).toBeCalledWith(userId, deviceId)
     })
 
@@ -619,12 +619,12 @@ describe('LocalService', () => {
       const userEncCryptPrivKey = 'userEncCryptPrivKey'
       const deviceEncCryptPrivKey = 'deviceEncCryptPrivKey'
       primitives.cryptTransform = jest.fn().mockResolvedValue(deviceEncCryptPrivKey)
-      service.getUserEncryptedDocumentKey = jest.fn().mockResolvedValue(userEncCryptPrivKey)
+      service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue(userEncCryptPrivKey)
 
-      expect(await service.getDeviceEncryptedDocumentKey(userId, deviceId, documentId)).toEqual(
+      expect(await service.getDeviceDocumentDecryptKey(userId, deviceId, documentId)).toEqual(
         deviceEncCryptPrivKey
       )
-      expect(service.getUserEncryptedDocumentKey).toBeCalledWith(userId, documentId)
+      expect(service.getUserDocumentDecryptKey).toBeCalledWith(userId, documentId)
       expect(primitives.cryptTransform).toBeCalledWith(
         deviceRecord.cryptTransformKey,
         userEncCryptPrivKey
@@ -632,18 +632,18 @@ describe('LocalService', () => {
     })
   })
 
-  describe('getHasAccess', () => {
-    it('resolves true if getCredentials resolves truthy', async () => {
+  describe('getHasReadAccess', () => {
+    it('resolves true if getUserDocumentDecryptKey resolves truthy', async () => {
       const userId = 'testUserId'
       const documentId = 'testDocumentId'
 
-      service.getCredentials = jest.fn().mockResolvedValue(undefined)
-      expect(await service.getHasAccess(userId, documentId)).toEqual(false)
-      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+      service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue(undefined)
+      expect(await service.getHasReadAccess(userId, documentId)).toEqual(false)
+      expect(service.getUserDocumentDecryptKey).toBeCalledWith(userId, documentId)
 
-      service.getCredentials = jest.fn().mockResolvedValue({})
-      expect(await service.getHasAccess(userId, documentId)).toEqual(true)
-      expect(service.getCredentials).toBeCalledWith(userId, documentId)
+      service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue('shouldntmatter')
+      expect(await service.getHasReadAccess(userId, documentId)).toEqual(true)
+      expect(service.getUserDocumentDecryptKey).toBeCalledWith(userId, documentId)
     })
   })
 })

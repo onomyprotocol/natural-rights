@@ -18,7 +18,7 @@ describe('Natural rights integration tests', () => {
 
     return new Client(
       new RemoteHttpService(Primitives, `http://localhost:${port}`),
-      userId,
+      '',
       deviceId,
       deviceCryptKeyPair,
       deviceSignKeyPair
@@ -82,15 +82,14 @@ describe('Natural rights integration tests', () => {
     })
 
     it('allows alice to grant bob access to a document', async () => {
-      const documentId = 'testDocumentId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.grantAccess(documentId, 'user', 'bob')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      await alice.grantReadAccess(documentId, 'user', bob.userId)
 
-      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await bob.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
 
       let eveSuccess = false
       try {
-        await eve.decryptDocument(documentId)
+        await eve.decryptDocumentEncryptionKey(documentId)
         eveSuccess = true
       } catch (e) {
         expect(e).toEqual([
@@ -108,17 +107,16 @@ describe('Natural rights integration tests', () => {
     })
 
     it("allows alice to revoke bob's access to her document", async () => {
-      const documentId = 'testDocumentId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.grantAccess(documentId, 'user', 'bob')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      await alice.grantReadAccess(documentId, 'user', bob.userId)
 
-      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
-      await alice.revokeAccess(documentId, 'user', 'bob')
+      expect(await bob.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
+      await alice.revokeAccess(documentId, 'user', bob.userId)
 
       let bobSuccess = false
 
       try {
-        await bob.decryptDocument(documentId)
+        await bob.decryptDocumentEncryptionKey(documentId)
         bobSuccess = true
       } catch (e) {
         expect(e).toEqual([
@@ -136,16 +134,15 @@ describe('Natural rights integration tests', () => {
     })
 
     it('allows bob to grant carol access to a document he is given access to from alice', async () => {
-      const documentId = 'testDocumentId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.grantAccess(documentId, 'user', 'bob')
-      await bob.grantAccess(documentId, 'user', 'carol')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      await alice.grantReadAccess(documentId, 'user', bob.userId)
+      await bob.grantReadAccess(documentId, 'user', carol.userId)
 
-      expect(await carol.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await carol.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
 
       let eveSuccess = false
       try {
-        await eve.decryptDocument(documentId)
+        await eve.decryptDocumentEncryptionKey(documentId)
         eveSuccess = true
       } catch (e) {
         expect(e).toEqual([
@@ -163,18 +160,16 @@ describe('Natural rights integration tests', () => {
     })
 
     it('allows alice to grant bob access to a document through a group', async () => {
-      const documentId = 'testDocumentId'
-      const groupId = 'testGroupId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.createGroup(groupId)
-      await alice.grantAccess(documentId, 'group', groupId)
-      await alice.addMemberToGroup(groupId, 'bob')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      const groupId = await alice.createGroup()
+      await alice.grantReadAccess(documentId, 'group', groupId)
+      await alice.addReaderToGroup(groupId, bob.userId)
 
-      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await bob.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
 
       let eveSuccess = false
       try {
-        await eve.decryptDocument(documentId)
+        await eve.decryptDocumentEncryptionKey(documentId)
         eveSuccess = true
       } catch (e) {
         expect(e).toEqual([
@@ -193,16 +188,14 @@ describe('Natural rights integration tests', () => {
 
     it('does not allow group members to add other members', async () => {
       try {
-        const documentId = 'testDocumentId'
-        const groupId = 'testGroupId'
-        await alice.encryptDocument(documentId)
-        await alice.createGroup(groupId)
-        await alice.grantAccess(documentId, 'group', groupId)
-        await alice.addMemberToGroup(groupId, 'bob')
+        const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+        const groupId = await alice.createGroup()
+        await alice.grantReadAccess(documentId, 'group', groupId)
+        await alice.addReaderToGroup(groupId, bob.userId)
 
         let bobSuccess = false
         try {
-          await bob.addMemberToGroup(groupId, 'carol')
+          await bob.addReaderToGroup(groupId, carol.userId)
           bobSuccess = true
         } catch (e) {
           expect(e).toEqual([
@@ -225,20 +218,18 @@ describe('Natural rights integration tests', () => {
     })
 
     it("allows alice to revoke bob's membership in a group", async () => {
-      const documentId = 'testDocumentId'
-      const groupId = 'testGroupId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.createGroup(groupId)
-      await alice.grantAccess(documentId, 'group', groupId)
-      await alice.addMemberToGroup(groupId, 'bob')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      const groupId = await alice.createGroup()
+      await alice.grantReadAccess(documentId, 'group', groupId)
+      await alice.addReaderToGroup(groupId, bob.userId)
 
-      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await bob.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
 
-      await alice.removeMemberFromGroup(groupId, 'bob')
+      await alice.removeMemberFromGroup(groupId, bob.userId)
 
       let bobSuccess = false
       try {
-        await bob.decryptDocument(documentId)
+        await bob.decryptDocumentEncryptionKey(documentId)
       } catch (e) {
         expect(e).toEqual([
           {
@@ -255,33 +246,29 @@ describe('Natural rights integration tests', () => {
     })
 
     it('allows alice to add bob as a group admin who can then add carol as a member', async () => {
-      const documentId = 'testDocumentId'
-      const groupId = 'testGroupId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.createGroup(groupId)
-      await alice.grantAccess(documentId, 'group', groupId)
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      const groupId = await alice.createGroup()
+      await alice.grantReadAccess(documentId, 'group', groupId)
 
-      await alice.addAdminToGroup(groupId, 'bob')
-      await bob.addMemberToGroup(groupId, 'carol')
+      await alice.addAdminToGroup(groupId, bob.userId)
+      await bob.addReaderToGroup(groupId, carol.userId)
 
-      expect(await carol.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await carol.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
     })
 
     it('allows alice to revoke a groups access to a document', async () => {
-      const documentId = 'testDocumentId'
-      const groupId = 'testGroupId'
-      const docCryptKeyPair = await alice.encryptDocument(documentId)
-      await alice.createGroup(groupId)
-      await alice.grantAccess(documentId, 'group', groupId)
-      await alice.addMemberToGroup(groupId, 'bob')
+      const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
+      const groupId = await alice.createGroup()
+      await alice.grantReadAccess(documentId, 'group', groupId)
+      await alice.addReaderToGroup(groupId, bob.userId)
 
-      expect(await bob.decryptDocument(documentId)).toEqual(docCryptKeyPair.privKey)
+      expect(await bob.decryptDocumentEncryptionKey(documentId)).toEqual(docCryptKeyPair.privKey)
 
       await alice.revokeAccess(documentId, 'group', groupId)
 
       let bobSuccess = false
       try {
-        await bob.decryptDocument(documentId)
+        await bob.decryptDocumentEncryptionKey(documentId)
         bobSuccess = true
       } catch (e) {
         expect(e).toEqual([

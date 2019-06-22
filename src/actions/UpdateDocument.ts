@@ -10,13 +10,17 @@ export class UpdateDocument extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return service.getHasAccess(this.userId, this.payload.documentId)
+    return service.getHasReadAccess(this.userId, this.payload.documentId)
   }
 
   async execute(service: LocalService) {
+    const document = (await service.db.getDocument(this.payload.documentId)) as DocumentRecord
+
     await service.db.putDocument({
+      ...document,
       id: this.payload.documentId,
-      userId: this.payload.userId,
+      cryptUserId: this.payload.cryptUserId,
+      cryptPubKey: this.payload.cryptPubKey,
       encCryptPrivKey: this.payload.encCryptPrivKey
     })
     return this.payload as UpdateDocumentResult

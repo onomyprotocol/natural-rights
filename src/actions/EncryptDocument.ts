@@ -12,14 +12,17 @@ export class EncryptDocument extends ActionHandler {
   async checkIsAuthorized(service: LocalService) {
     const existing = await service.db.getDocument(this.payload.documentId)
     if (existing) return false
-    return this.payload.userId === this.userId
+    return this.payload.cryptUserId === this.userId
   }
 
   async execute(service: LocalService) {
     await service.db.putDocument({
       id: this.payload.documentId,
-      userId: this.payload.userId,
-      encCryptPrivKey: this.payload.encCryptPrivKey
+      cryptUserId: this.payload.cryptUserId,
+      cryptPubKey: this.payload.cryptPubKey,
+      encCryptPrivKey: this.payload.encCryptPrivKey,
+      signUserId: this.payload.signUserId,
+      encSignPrivKey: this.payload.encSignPrivKey
     })
     return this.payload as EncryptDocumentResult
   }

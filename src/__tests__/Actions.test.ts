@@ -114,7 +114,6 @@ describe('Actions', () => {
       const deviceId = 'testDeviceId'
       const shared = {
         cryptPubKey: 'cryptPubKey',
-        signPubKey: 'signPubKey',
         encCryptPrivKey: 'encCryptPrivKey',
         encSignPrivKey: 'encSignPrivKey'
       }
@@ -204,14 +203,19 @@ describe('Actions', () => {
   })
 
   describe('CreateGroup', () => {
-    it('requires that the requesting user match the userId of the request', async () => {
-      const payload = {
-        userId: 'testUserId',
-        groupId: 'testGroupId',
-        cryptPubKey: 'groupCryptPubKey',
-        encCryptPrivKey: 'encGroupCryptPrivKey'
-      }
+    const userId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const groupId = 'testGroupId'
+    const shared = {
+      userId: 'testUserId',
+      cryptPubKey: 'groupCryptPubKey',
+      encCryptPrivKey: 'encGroupCryptPrivKey',
+      encSignPrivKey: 'encGroupSignPrivKey'
+    }
+    const payload = { ...shared, groupId }
+    const record = { ...shared, id: groupId }
 
+    it('requires that the requesting user match the userId of the request', async () => {
       const withMatch = new CreateGroup('testUserId', 'deviceId', payload)
       const withoutMatch = new CreateGroup('otherUserId', 'deviceId', payload)
 
@@ -220,19 +224,8 @@ describe('Actions', () => {
     })
 
     it('persists GroupRecord', async () => {
-      const userId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const groupId = 'testGroupId'
-      const shared = {
-        userId: 'testUserId',
-        cryptPubKey: 'groupCryptPubKey',
-        encCryptPrivKey: 'encGroupCryptPrivKey'
-      }
-      const payload = { ...shared, groupId }
-      const record = { ...shared, id: groupId }
-      db.putGroup = jest.fn().mockResolvedValue(undefined)
-
       const handler = new CreateGroup(userId, deviceId, payload)
+      db.putGroup = jest.fn().mockResolvedValue(undefined)
 
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.putGroup).toBeCalledWith(record)
@@ -240,16 +233,22 @@ describe('Actions', () => {
   })
 
   describe('AddMemberToGroup', () => {
-    it('requires that the requesting user be an admin of the group', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const groupId = 'testGroupId'
-      const payload = {
-        groupId,
-        userId: 'otherUserId',
-        cryptTransformKey: 'groupCryptTransformKey'
-      }
+    const requestingUserId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const groupId = 'testGroupId'
+    const payload = {
+      groupId,
+      userId: 'otherUserId',
+      cryptTransformKey: 'groupCryptTransformKey',
 
+      signPubKey: 'memberSignPubKey',
+      encSignPrivKey: 'encMemberSignPrivKey',
+      signTransformToUserId: requestingUserId,
+      signTransformKey: 'memberSignTransformKey'
+    }
+    const record = { ...payload, encGroupCryptPrivKey: '' }
+
+    it('requires that the requesting user be an admin of the group', async () => {
       const handler = new AddMemberToGroup(requestingUserId, deviceId, payload)
 
       service.getIsGroupAdmin = jest.fn().mockResolvedValue(false)
@@ -262,18 +261,8 @@ describe('Actions', () => {
     })
 
     it('persists MembershipRecord', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const groupId = 'testGroupId'
-      const payload = {
-        groupId,
-        userId: 'otherUserId',
-        cryptTransformKey: 'groupCryptTransformKey'
-      }
-      const record = { ...payload, encGroupCryptPrivKey: '' }
-      db.putMembership = jest.fn().mockResolvedValue(undefined)
-
       const handler = new AddMemberToGroup(requestingUserId, deviceId, payload)
+      db.putMembership = jest.fn().mockResolvedValue(undefined)
 
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.putMembership).toBeCalledWith(record)
@@ -281,15 +270,15 @@ describe('Actions', () => {
   })
 
   describe('RemoveMemberFromGroup', () => {
-    it('requires that the requesting user be an admin of the group or the user to remove', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const groupId = 'testGroupId'
-      const payload = {
-        groupId,
-        userId: 'otherUserId'
-      }
+    const requestingUserId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const groupId = 'testGroupId'
+    const payload = {
+      groupId,
+      userId: 'otherUserId'
+    }
 
+    it('requires that the requesting user be an admin of the group or the user to remove', async () => {
       const handler = new RemoveMemberFromGroup(requestingUserId, deviceId, payload)
 
       service.getIsGroupAdmin = jest.fn().mockResolvedValue(false)
@@ -307,16 +296,8 @@ describe('Actions', () => {
     })
 
     it('deletes MembershipRecord from database', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const groupId = 'testGroupId'
-      const payload = {
-        groupId,
-        userId: 'otherUserId'
-      }
-      db.deleteMembership = jest.fn().mockResolvedValue(undefined)
-
       const handler = new RemoveMemberFromGroup(requestingUserId, deviceId, payload)
+      db.deleteMembership = jest.fn().mockResolvedValue(undefined)
 
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.deleteMembership).toBeCalledWith(groupId, payload.userId)
@@ -472,14 +453,24 @@ describe('Actions', () => {
   })
 
   describe('EncryptDocument', () => {
-    it('requires that the requesting user match the userId of the request', async () => {
-      const payload = {
-        userId: 'testUserId',
-        documentId: 'testDocumentId',
-        encCryptPrivKey: 'documentEncCryptPrivKey'
-      }
+    const documentId = 'testDocumentId'
+    const requestingUserId = 'testUserId'
+    const shared = {
+      id: documentId,
+      signUserId: requestingUserId,
+      cryptUserId: requestingUserId,
+      cryptPubKey: 'documentCryptPubKey',
+      encCryptPrivKey: 'documentEncCryptPrivKey',
+      encSignPrivKey: 'documentEncSignPrivKey'
+    }
+    const payload = {
+      ...shared,
+      documentId
+    }
+    const record = { ...shared, id: documentId }
 
-      const withMatch = new EncryptDocument(payload.userId, 'deviceId', payload)
+    it('requires that the requesting user match the userId of the request', async () => {
+      const withMatch = new EncryptDocument(requestingUserId, 'deviceId', payload)
       const withoutMatch = new EncryptDocument('otherUserId', 'deviceId', payload)
 
       expect(await withMatch.checkIsAuthorized(service)).toEqual(true)
@@ -493,19 +484,8 @@ describe('Actions', () => {
     })
 
     it('persists DocumentRecord', async () => {
-      const documentId = 'testDocumentId'
-      const shared = {
-        userId: 'testUserId',
-        encCryptPrivKey: 'documentEncCryptPrivKey'
-      }
-      const payload = {
-        ...shared,
-        documentId
-      }
-      const record = { ...shared, id: documentId }
+      const handler = new EncryptDocument(requestingUserId, 'deviceId', payload)
       db.putDocument = jest.fn().mockResolvedValue(undefined)
-
-      const handler = new EncryptDocument(payload.userId, 'deviceId', payload)
 
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.putDocument).toBeCalledWith(record)
@@ -513,41 +493,36 @@ describe('Actions', () => {
   })
 
   describe('GrantAccess', () => {
-    it('requires that the requesitng user have access to the document', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const documentId = 'testDocumentId'
-      const payload = {
-        id: 'otherUserId',
-        documentId,
-        kind: 'user' as GrantKind,
-        encCryptPrivKey: 'groupEncCryptPrivKey'
-      }
+    const requestingUserId = 'testUserId'
+    const deviceId = 'testDeviceId'
+    const documentId = 'testDocumentId'
+    const payload = {
+      id: 'otherUserId',
+      documentId,
+      kind: 'user',
+      encCryptPrivKey: 'grantEncCryptPrivKey',
+      signPubKey: 'grantSignPubKey',
+      encSignPrivKey: 'grantEncSignPrivKey',
+      signTransformToKind: 'user',
+      signTransformToId: 'grantSignTransformToUserId',
+      signTransformKey: 'grantSignTransformKey'
+    } as GrantAccessAction
 
+    it('requires that the requesitng user have access to the document', async () => {
       const handler = new GrantAccess(requestingUserId, deviceId, payload)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(false)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(false)
       expect(await handler.checkIsAuthorized(service)).toEqual(false)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
     })
 
     it('persists documentId, userIdOrGroupId, encryptedDecryptionKey', async () => {
-      const requestingUserId = 'testUserId'
-      const deviceId = 'testDeviceId'
-      const documentId = 'testDocumentId'
-      const payload = {
-        id: 'otherUserId',
-        documentId,
-        kind: 'user' as GrantKind,
-        encCryptPrivKey: 'groupEncCryptPrivKey'
-      }
-      db.putGrant = jest.fn().mockResolvedValue(undefined)
-
       const handler = new GrantAccess(requestingUserId, deviceId, payload)
+      db.putGrant = jest.fn().mockResolvedValue(undefined)
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.putGrant).toBeCalledWith(payload)
     })
@@ -564,13 +539,13 @@ describe('Actions', () => {
 
       const handler = new DecryptDocument(requestingUserId, deviceId, payload)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(false)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(false)
       expect(await handler.checkIsAuthorized(service)).toEqual(false)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
     })
 
     it('resolves device encrypted document key', async () => {
@@ -581,7 +556,7 @@ describe('Actions', () => {
         documentId
       }
       const encCryptPrivKey = 'deviceEncryptedDocumentKey'
-      service.getDeviceEncryptedDocumentKey = jest.fn().mockResolvedValue(encCryptPrivKey)
+      service.getDeviceDocumentDecryptKey = jest.fn().mockResolvedValue(encCryptPrivKey)
 
       const handler = new DecryptDocument(requestingUserId, deviceId, payload)
 
@@ -598,7 +573,7 @@ describe('Actions', () => {
       const payload = {
         documentId
       }
-      service.getDeviceEncryptedDocumentKey = jest.fn().mockResolvedValue(null)
+      service.getDeviceDocumentDecryptKey = jest.fn().mockResolvedValue(null)
 
       const handler = new DecryptDocument(requestingUserId, deviceId, payload)
       let success = false
@@ -627,13 +602,13 @@ describe('Actions', () => {
 
       const handler = new RevokeAccess(requestingUserId, deviceId, payload)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(false)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(false)
       expect(await handler.checkIsAuthorized(service)).toEqual(false)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
     })
 
     it('deletes grant record', async () => {
@@ -645,7 +620,7 @@ describe('Actions', () => {
         kind: 'user' as GrantKind,
         id: 'otherUserId'
       }
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
       db.deleteGrant = jest.fn().mockResolvedValue(undefined)
 
       const handler = new RevokeAccess(requestingUserId, deviceId, payload)
@@ -655,32 +630,47 @@ describe('Actions', () => {
     })
   })
 
+  describe('SignDocument', () => {
+    describe('authorization', () => {
+      it.todo('requires that the requesting user be granted write access to the document')
+    })
+
+    describe('execution', () => {
+      it.todo('transforms provided device signature to user signature')
+      it.todo('transforms user signature to group signature if necessary')
+      it.todo('transforms user or group signature to document signature')
+      it.todo('returns document signature in response')
+    })
+  })
+
   describe('UpdateDocument', () => {
     it('requires that the requesitng user have access to the document', async () => {
       const requestingUserId = 'testUserId'
       const deviceId = 'testDeviceId'
       const documentId = 'testDocumentId'
       const payload = {
-        userId: 'testUserId',
+        cryptUserId: 'testUserId',
+        cryptPubKey: 'documentCryptPubKey',
         documentId: 'testDocumentId',
         encCryptPrivKey: 'documentEncCryptPrivKey'
       }
 
       const handler = new UpdateDocument(requestingUserId, deviceId, payload)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(false)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(false)
       expect(await handler.checkIsAuthorized(service)).toEqual(false)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
 
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
-      expect(service.getHasAccess).toBeCalledWith(requestingUserId, documentId)
+      expect(service.getHasReadAccess).toBeCalledWith(requestingUserId, documentId)
     })
 
     it('persists updated DocumentRecord', async () => {
       const documentId = 'testDocumentId'
       const shared = {
-        userId: 'testUserId',
+        cryptUserId: 'testUserId',
+        cryptPubKey: 'documentCryptPubKey',
         encCryptPrivKey: 'documentEncCryptPrivKey'
       }
       const payload = {
@@ -689,9 +679,9 @@ describe('Actions', () => {
       }
       const record = { ...shared, id: documentId }
       db.putDocument = jest.fn().mockResolvedValue(undefined)
-      service.getHasAccess = jest.fn().mockResolvedValue(true)
+      service.getHasReadAccess = jest.fn().mockResolvedValue(true)
 
-      const handler = new UpdateDocument(payload.userId, 'deviceId', payload)
+      const handler = new UpdateDocument(payload.cryptUserId, 'deviceId', payload)
 
       expect(await handler.execute(service)).toEqual(payload)
       expect(db.putDocument).toBeCalledWith(record)
@@ -711,7 +701,6 @@ describe('Actions', () => {
 
       db.getUser = jest.fn().mockResolvedValue({
         cryptPubKey,
-        signPubKey,
         encCryptPrivKey: 'shouldntmatter',
         encSignPrivKey: 'shouldntmatter'
       } as UserRecord)
@@ -720,8 +709,7 @@ describe('Actions', () => {
       expect(await handler.execute(service)).toEqual({
         kind: 'user',
         id: userId,
-        cryptPubKey,
-        signPubKey
+        cryptPubKey
       })
 
       expect(db.getUser).toBeCalledWith(userId)

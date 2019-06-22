@@ -108,7 +108,7 @@ export class LocalService implements ServiceInterface {
     ])
 
     if (!document) return
-    if (document.userId === userId) return { document }
+    if (document.cryptUserId === userId) return { document }
 
     for (let grant of grants) {
       if (grant.kind === 'user') {
@@ -121,7 +121,12 @@ export class LocalService implements ServiceInterface {
     }
   }
 
-  async getUserEncryptedDocumentKey(userId: string, documentId: string) {
+  async getWriteCredentials(userId: string, documentId: string) {
+    const credentials = await this.getCredentials(userId, documentId)
+    if (!credentials) return credentials
+  }
+
+  async getUserDocumentDecryptKey(userId: string, documentId: string) {
     const credentials = await this.getCredentials(userId, documentId)
     if (!credentials) return ''
     if (!credentials.grant) return credentials.document.encCryptPrivKey
@@ -132,16 +137,20 @@ export class LocalService implements ServiceInterface {
     )
   }
 
-  async getDeviceEncryptedDocumentKey(userId: string, deviceId: string, documentId: string) {
+  async getDeviceDocumentDecryptKey(userId: string, deviceId: string, documentId: string) {
     const [userKey, device] = await Promise.all([
-      this.getUserEncryptedDocumentKey(userId, documentId),
+      this.getUserDocumentDecryptKey(userId, documentId),
       this.db.getDevice(userId, deviceId)
     ])
     if (!userKey || !device || !device.cryptTransformKey) return ''
     return this.primitives.cryptTransform(device.cryptTransformKey, userKey)
   }
 
-  async getHasAccess(userId: string, documentId: string) {
-    return !!(await this.getCredentials(userId, documentId))
+  async getHasReadAccess(userId: string, documentId: string) {
+    return !!(await this.getUserDocumentDecryptKey(userId, documentId))
+  }
+
+  async getHasWriteAccess(userId: string, documentId: string) {
+    return !!(await this.getWriteCredentials(userId, documentId))
   }
 }

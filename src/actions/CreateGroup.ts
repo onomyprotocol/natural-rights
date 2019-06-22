@@ -18,7 +18,9 @@ export class CreateGroup extends ActionHandler {
       id: this.payload.groupId,
       userId: this.payload.userId,
       cryptPubKey: this.payload.cryptPubKey,
-      encCryptPrivKey: this.payload.encCryptPrivKey
+      encCryptPrivKey: this.payload.encCryptPrivKey,
+
+      encSignPrivKey: this.payload.encSignPrivKey
     })
 
     return this.payload as CreateGroupResult
