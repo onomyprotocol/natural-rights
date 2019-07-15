@@ -43,15 +43,18 @@ export class Client implements ClientInterface {
     const userCryptKeyPair = await this.service.primitives.cryptKeyGen()
     const deviceCryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       userCryptKeyPair,
-      this.deviceCryptKeyPair.pubKey
+      this.deviceCryptKeyPair.pubKey,
+      this.deviceSignKeyPair
     )
     const userEncSignPrivKey = await this.service.primitives.encrypt(
       userCryptKeyPair.pubKey,
-      userSignKeyPair.privKey
+      userSignKeyPair.privKey,
+      this.deviceSignKeyPair
     )
     const userEncCryptPrivKey = await this.service.primitives.encrypt(
       userCryptKeyPair.pubKey,
-      userCryptKeyPair.privKey
+      userCryptKeyPair.privKey,
+      this.deviceSignKeyPair
     )
 
     this.userId = userSignKeyPair.pubKey
@@ -85,7 +88,8 @@ export class Client implements ClientInterface {
     const deviceSignKeyPair = await this.service.primitives.signKeyGen()
     const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       userCryptKeyPair,
-      deviceCryptKeyPair.pubKey
+      deviceCryptKeyPair.pubKey,
+      deviceSignKeyPair
     )
 
     await this.request([
@@ -125,15 +129,18 @@ export class Client implements ClientInterface {
     const groupSignKeyPair = await this.service.primitives.signKeyGen()
     const encCryptPrivKey = await this.service.primitives.encrypt(
       ownerPubKey,
-      groupCryptKeyPair.privKey
+      groupCryptKeyPair.privKey,
+      this.deviceSignKeyPair
     )
     const encSignPrivKey = await this.service.primitives.encrypt(
       ownerPubKey,
-      groupSignKeyPair.privKey
+      groupSignKeyPair.privKey,
+      this.deviceSignKeyPair
     )
     const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       groupCryptKeyPair,
-      ownerPubKey
+      ownerPubKey,
+      this.deviceSignKeyPair
     )
     const groupId = groupSignKeyPair.pubKey
 
@@ -173,7 +180,8 @@ export class Client implements ClientInterface {
     const groupCryptKeyPair = await this.getEncryptionKeyPair('group', groupId)
     const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       groupCryptKeyPair,
-      memberPubKey
+      memberPubKey,
+      this.deviceSignKeyPair
     )
     await this.request([
       {
@@ -182,6 +190,19 @@ export class Client implements ClientInterface {
           groupId,
           userId,
           cryptTransformKey
+        }
+      }
+    ] as [Action<AddMemberToGroupAction>])
+  }
+
+  async addSignerToGroup(groupId: string, userId: string) {
+    await this.request([
+      {
+        type: 'AddMemberToGroup',
+        payload: {
+          groupId,
+          userId,
+          canSign: true
         }
       }
     ] as [Action<AddMemberToGroupAction>])
@@ -204,11 +225,13 @@ export class Client implements ClientInterface {
     const groupCryptKeyPair = await this.getEncryptionKeyPair('group', groupId)
     const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       groupCryptKeyPair,
-      memberPubKey
+      memberPubKey,
+      this.deviceSignKeyPair
     )
     const encCryptPrivKey = await this.service.primitives.encrypt(
       memberPubKey,
-      groupCryptKeyPair.privKey
+      groupCryptKeyPair.privKey,
+      this.deviceSignKeyPair
     )
     await this.request([
       {
@@ -216,7 +239,8 @@ export class Client implements ClientInterface {
         payload: {
           groupId,
           userId,
-          cryptTransformKey
+          cryptTransformKey,
+          canSign: true
         }
       },
       {
@@ -244,35 +268,29 @@ export class Client implements ClientInterface {
 
   async createDocument() {
     const userCryptPubKey = await this.getEncryptionPublicKey('user', this.userId)
-    const docSignKeyPair = await this.service.primitives.signKeyGen()
-    const { pubKey: documentId } = docSignKeyPair
     const docCryptKeyPair = await this.service.primitives.cryptKeyGen()
-    const encSignPrivKey = await this.service.primitives.encrypt(
-      userCryptPubKey,
-      docSignKeyPair.privKey
-    )
     const encCryptPrivKey = await this.service.primitives.encrypt(
       userCryptPubKey,
-      docCryptKeyPair.privKey
+      docCryptKeyPair.privKey,
+      this.deviceSignKeyPair
     )
 
-    await this.request([
+    const response = await this.request([
       {
-        type: 'EncryptDocument',
+        type: 'CreateDocument',
         payload: {
-          documentId,
           cryptUserId: this.userId,
-          signUserId: this.userId,
+          creatorId: this.userId,
 
-          encCryptPrivKey,
-          encSignPrivKey
+          encCryptPrivKey
         }
       }
-    ] as [Action<EncryptDocumentAction>])
+    ] as [Action<CreateDocumentAction>])
+    const result = response.results.find(({ type }) => type === 'CreateDocument')
+    if (!result) throw new Error('No result')
 
     return {
-      id: documentId,
-      signKeyPair: docSignKeyPair,
+      id: (result.payload! as CreateDocumentResult).documentId,
       cryptKeyPair: docCryptKeyPair
     }
   }
@@ -280,7 +298,11 @@ export class Client implements ClientInterface {
   async grantReadAccess(documentId: string, kind: GrantKind, id: string) {
     const granteePubKey = await this.getEncryptionPublicKey(kind, id)
     const docCryptPrivKey = await this.decryptDocumentEncryptionKey(documentId)
-    const encCryptPrivKey = await this.service.primitives.encrypt(granteePubKey, docCryptPrivKey)
+    const encCryptPrivKey = await this.service.primitives.encrypt(
+      granteePubKey,
+      docCryptPrivKey,
+      this.deviceSignKeyPair
+    )
     await this.request([
       {
         type: 'GrantAccess',
@@ -294,14 +316,7 @@ export class Client implements ClientInterface {
     ] as [Action<GrantAccessAction>])
   }
 
-  async grantWriteAccess(documentId: string, kind: GrantKind, id: string) {
-    const docSignKeyPair = await this.getSignatureKeyPair('document', documentId)
-    const granteePubKey = await this.getSignaturePublicKey(kind, id)
-    const signTransformKey = await this.service.primitives.signTransformKeyGen!(
-      docSignKeyPair,
-      granteePubKey
-    )
-
+  async grantSignAccess(documentId: string, kind: GrantKind, id: string) {
     await this.request([
       {
         type: 'GrantAccess',
@@ -309,9 +324,7 @@ export class Client implements ClientInterface {
           documentId,
           kind,
           id,
-
-          signTransformToId: this.userId,
-          signTransformKey
+          canSign: true
         }
       }
     ])
@@ -333,11 +346,6 @@ export class Client implements ClientInterface {
     return cryptPrivKey
   }
 
-  async decryptDocumentSignatureKey(documentId: string) {
-    throw new Error('Not yet implemented')
-    return ''
-  }
-
   async revokeAccess(documentId: string, kind: GrantKind, id: string) {
     await this.request([
       {
@@ -351,12 +359,13 @@ export class Client implements ClientInterface {
     ] as [Action<RevokeAccessAction>])
   }
 
-  async updateDocument(documentId: string) {
+  async updateDocumentEncryption(documentId: string) {
     const userPubKey = await this.getEncryptionPublicKey('user', this.userId)
     const docCryptKeyPair = await this.service.primitives.cryptKeyGen()
     const encCryptPrivKey = await this.service.primitives.encrypt(
       userPubKey,
-      docCryptKeyPair.privKey
+      docCryptKeyPair.privKey,
+      this.deviceSignKeyPair
     )
     await this.request([
       {
@@ -370,6 +379,33 @@ export class Client implements ClientInterface {
       }
     ] as [Action<UpdateDocumentAction>])
     return docCryptKeyPair
+  }
+
+  async signDocumentTexts(documentId: string, textsToSign: string[]) {
+    const hashes = await Promise.all(textsToSign.map(this.service.sea.hashForSignature))
+    const response = await this.request([
+      {
+        type: 'SignDocument',
+        payload: {
+          documentId,
+          hashes
+        }
+      }
+    ] as [Action<SignDocumentAction>])
+    const result = response.results.find(({ type }) => type === 'SignDocument')
+    if (!result) throw new Error('No SignDocument result')
+    return (result.payload as SignDocumentResult).signatures
+  }
+
+  async decryptDocumentTexts(documentId: string, ciphertexts: string[]) {
+    const privKey = await this.decryptDocumentEncryptionKey(documentId)
+    const keyPair = {
+      pubKey: '', // TODO get pubkey
+      privKey
+    }
+    return Promise.all(
+      ciphertexts.map(ciphertext => this.service.primitives.decrypt(keyPair, ciphertext))
+    )
   }
 
   async getPublicKeys(kind: SignatureKind, id: string) {
@@ -411,21 +447,7 @@ export class Client implements ClientInterface {
     return keys.cryptPubKey
   }
 
-  async getSignaturePublicKey(kind: SignatureKind, id: string) {
-    const keys = await this.getPublicKeys(kind, id)
-    return keys.signPubKey
-  }
-
   async getEncryptionKeyPair(kind: GrantKind, id: string) {
-    const pairs = await this.getKeyPairs(kind, id)
-
-    return {
-      pubKey: pairs.cryptPubKey,
-      privKey: await this.service.primitives.decrypt(this.deviceCryptKeyPair, pairs.encCryptPrivKey)
-    }
-  }
-
-  async getSignatureKeyPair(kind: SignatureKind, id: string) {
     const pairs = await this.getKeyPairs(kind, id)
 
     return {

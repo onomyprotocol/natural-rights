@@ -4,17 +4,16 @@
   "description": "",
   "keywords": [],
   "main": "dist/natural-rights.umd.js",
+  "module": "es/index.js",
   "module": "dist/natural-rights.es5.js",
   "typings": "dist/types/natural-rights.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "engines": {
     "node": ">=6.0.0"
   },
   "scripts": {
     "lint": "tslint  --project tsconfig.json -t codeFrame 'src/**/*.ts' 'test/**/*.ts'",
-    "prebuild": "rimraf dist",
+    "prebuild": "rimraf dist es",
     "build": "tsc --module commonjs && rollup -c rollup.config.ts && typedoc --out docs --target es6 --theme minimal --mode file src",
     "start": "rollup -c rollup.config.ts -w",
     "test": "jest --coverage",
@@ -29,10 +28,7 @@
     "travis-deploy-once": "travis-deploy-once"
   },
   "lint-staged": {
-    "{src,test}/**/*.ts": [
-      "prettier --write",
-      "git add"
-    ]
+    "{src,test}/**/*.ts": ["prettier --write", "git add"]
   },
   "config": {
     "commitizen": {
@@ -45,19 +41,9 @@
     },
     "testEnvironment": "node",
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/dist/"
-    ],
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js"
-    ],
-    "coveragePathIgnorePatterns": [
-      "/node_modules/",
-      "/test/"
-    ],
+    "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/es/"],
+    "moduleFileExtensions": ["ts", "tsx", "js"],
+    "coveragePathIgnorePatterns": ["/node_modules/", "/test/"],
     "coverageThreshold": {
       "global": {
         "branches": 90,
@@ -66,10 +52,7 @@
         "statements": 95
       }
     },
-    "collectCoverageFrom": [
-      "src/*.{js,ts}",
-      "src/actions/*.{js,ts}"
-    ],
+    "collectCoverageFrom": ["src/*.{js,ts}", "src/actions/*.{js,ts}"],
     "reporters": [
       "default",
       [
@@ -85,9 +68,7 @@
     "singleQuote": true
   },
   "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
-    ]
+    "extends": ["@commitlint/config-conventional"]
   },
   "devDependencies": {
     "@commitlint/cli": "^8.0.0",
@@ -132,6 +113,7 @@
   "dependencies": {
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
+    "gun": "^0.2019.627",
     "isomorphic-fetch": "^2.2.1",
     "node-lmdb": "^0.6.2"
   }

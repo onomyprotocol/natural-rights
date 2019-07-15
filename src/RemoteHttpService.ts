@@ -2,11 +2,13 @@ import 'isomorphic-fetch'
 
 export class RemoteHttpService implements ServiceInterface {
   primitives: PrimitivesInterface
+  sea: SEAPrimitivesInterface
   url: string
 
-  constructor(primitives: PrimitivesInterface, url: string) {
+  constructor(primitives: PrimitivesInterface, sea: SEAPrimitivesInterface, url: string) {
     this.primitives = primitives
     this.url = url
+    this.sea = sea
   }
 
   async request(req: NaturalRightsRequest) {

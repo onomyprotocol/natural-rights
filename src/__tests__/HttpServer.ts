@@ -1,5 +1,6 @@
 import { HttpServer } from '../HttpServer'
 import { RemoteHttpService } from '../RemoteHttpService'
+import { SEA } from '../SEA'
 
 describe('HttpServer', () => {
   const port = 4242
@@ -9,6 +10,7 @@ describe('HttpServer', () => {
 
   beforeEach(() => {
     service = {
+      sea: SEA,
       primitives: {
         cryptKeyGen: jest.fn().mockResolvedValue({
           privKey: 'cryptPrivKey',
@@ -50,7 +52,7 @@ describe('HttpServer', () => {
     const deviceId = 'testdeviceid'
     const documentId = 'testDocumentId'
 
-    const client = new RemoteHttpService(service.primitives, `http://localhost:${port}`)
+    const client = new RemoteHttpService(service.primitives, SEA, `http://localhost:${port}`)
     const actions = [
       {
         type: 'DecryptDocument',
@@ -79,6 +81,7 @@ describe('HttpServer', () => {
 
     const client = new RemoteHttpService(
       service.primitives,
+      SEA,
       `http://localhost:${port}/intentionallybadurl`
     )
     const actions = [

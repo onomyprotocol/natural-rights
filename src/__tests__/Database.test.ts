@@ -137,7 +137,8 @@ describe('Database', () => {
           id: groupId,
           userId: 'testUserId',
           cryptPubKey: '',
-          encCryptPrivKey: ''
+          encCryptPrivKey: '',
+          encSignPrivKey: ''
         }
 
         expect(await db.getGroup(groupId)).toEqual(null)
@@ -157,7 +158,8 @@ describe('Database', () => {
           id: groupId,
           userId: 'testUserId',
           cryptPubKey: '',
-          encCryptPrivKey: ''
+          encCryptPrivKey: '',
+          encSignPrivKey: ''
         }
 
         await db.putGroup(groupRecord)
@@ -185,11 +187,8 @@ describe('Database', () => {
       groupId,
       userId,
       cryptTransformKey: '',
-      signPubKey: '',
-      encSignPrivKey: '',
-      signTransformToUserId: '',
-      signTransformKey: '',
-      encGroupCryptPrivKey: ''
+      encGroupCryptPrivKey: '',
+      canSign: false
     }
 
     describe('getMembership', () => {
@@ -228,8 +227,8 @@ describe('Database', () => {
       cryptUserId: '',
       cryptPubKey: '',
       encCryptPrivKey: '',
-      signUserId: '',
-      encSignPrivKey: ''
+      creatorId: '',
+      signPrivKey: ''
     }
 
     describe('getDocument', () => {
@@ -265,12 +264,7 @@ describe('Database', () => {
       id: userId,
       kind: 'user',
       encCryptPrivKey: '',
-
-      signPubKey: '',
-      encSignPrivKey: '',
-      signTransformKey: '',
-      signTransformToKind: 'user',
-      signTransformToId: ''
+      canSign: false
     }
 
     describe('getGrant', () => {

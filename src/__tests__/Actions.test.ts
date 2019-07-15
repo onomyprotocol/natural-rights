@@ -7,7 +7,7 @@ import {
   RemoveMemberFromGroup,
   AddAdminToGroup,
   RemoveAdminFromGroup,
-  EncryptDocument,
+  CreateDocument,
   GrantAccess,
   DecryptDocument,
   RevokeAccess,
@@ -17,6 +17,7 @@ import {
 } from '../actions'
 import { ActionHandler } from '../actions/ActionHandler'
 import { LocalService } from '../LocalService'
+import { SEA } from '../SEA'
 
 describe('Actions', () => {
   let primitives: PrimitivesInterface
@@ -57,7 +58,7 @@ describe('Actions', () => {
       close: jest.fn()
     }
 
-    service = new LocalService(primitives, dbAdapter)
+    service = new LocalService(primitives, SEA, dbAdapter)
     db = service.db
   })
 
@@ -113,6 +114,7 @@ describe('Actions', () => {
       const userId = 'testUserId'
       const deviceId = 'testDeviceId'
       const shared = {
+        signPubKey: 'signPubKey',
         cryptPubKey: 'cryptPubKey',
         encCryptPrivKey: 'encCryptPrivKey',
         encSignPrivKey: 'encSignPrivKey'
@@ -240,11 +242,7 @@ describe('Actions', () => {
       groupId,
       userId: 'otherUserId',
       cryptTransformKey: 'groupCryptTransformKey',
-
-      signPubKey: 'memberSignPubKey',
-      encSignPrivKey: 'encMemberSignPrivKey',
-      signTransformToUserId: requestingUserId,
-      signTransformKey: 'memberSignTransformKey'
+      canSign: false
     }
     const record = { ...payload, encGroupCryptPrivKey: '' }
 
@@ -452,39 +450,39 @@ describe('Actions', () => {
     })
   })
 
-  describe('EncryptDocument', () => {
+  describe('CreateDocument', () => {
     const documentId = 'testDocumentId'
+    const docSignPrivKey = 'docSignPrivKey'
     const requestingUserId = 'testUserId'
     const shared = {
-      id: documentId,
-      signUserId: requestingUserId,
+      creatorId: requestingUserId,
       cryptUserId: requestingUserId,
       cryptPubKey: 'documentCryptPubKey',
-      encCryptPrivKey: 'documentEncCryptPrivKey',
-      encSignPrivKey: 'documentEncSignPrivKey'
+      encCryptPrivKey: 'documentEncCryptPrivKey'
     }
     const payload = {
       ...shared,
       documentId
     }
-    const record = { ...shared, id: documentId }
+    const record = { ...shared, id: documentId, signPrivKey: docSignPrivKey }
+
+    beforeEach(() => {
+      service.sea.signKeyGen = jest.fn().mockResolvedValue({
+        pubKey: documentId,
+        privKey: docSignPrivKey
+      })
+    })
 
     it('requires that the requesting user match the userId of the request', async () => {
-      const withMatch = new EncryptDocument(requestingUserId, 'deviceId', payload)
-      const withoutMatch = new EncryptDocument('otherUserId', 'deviceId', payload)
+      const withMatch = new CreateDocument(requestingUserId, 'deviceId', payload)
+      const withoutMatch = new CreateDocument('otherUserId', 'deviceId', payload)
 
       expect(await withMatch.checkIsAuthorized(service)).toEqual(true)
       expect(await withoutMatch.checkIsAuthorized(service)).toEqual(false)
-
-      db.getDocument = jest.fn().mockResolvedValue({
-        documentId: 'testDocumentId'
-      })
-
-      expect(await withMatch.checkIsAuthorized(service)).toEqual(false)
     })
 
     it('persists DocumentRecord', async () => {
-      const handler = new EncryptDocument(requestingUserId, 'deviceId', payload)
+      const handler = new CreateDocument(requestingUserId, 'deviceId', payload)
       db.putDocument = jest.fn().mockResolvedValue(undefined)
 
       expect(await handler.execute(service)).toEqual(payload)
@@ -501,11 +499,7 @@ describe('Actions', () => {
       documentId,
       kind: 'user',
       encCryptPrivKey: 'grantEncCryptPrivKey',
-      signPubKey: 'grantSignPubKey',
-      encSignPrivKey: 'grantEncSignPrivKey',
-      signTransformToKind: 'user',
-      signTransformToId: 'grantSignTransformToUserId',
-      signTransformKey: 'grantSignTransformKey'
+      canSign: false
     } as GrantAccessAction
 
     it('requires that the requesitng user have access to the document', async () => {
@@ -860,8 +854,16 @@ describe('Actions', () => {
         encSignPrivKey: `transformed:${deviceCryptTransformKey}:${userEncSignPrivKey}`
       })
       expect(db.getUser).toBeCalledWith(userId)
-      expect(primitives.cryptTransform).toBeCalledWith(deviceCryptTransformKey, userEncCryptPrivKey)
-      expect(primitives.cryptTransform).toBeCalledWith(deviceCryptTransformKey, userEncSignPrivKey)
+      expect(primitives.cryptTransform).toBeCalledWith(
+        deviceCryptTransformKey,
+        userEncCryptPrivKey,
+        service.signKeyPair
+      )
+      expect(primitives.cryptTransform).toBeCalledWith(
+        deviceCryptTransformKey,
+        userEncSignPrivKey,
+        service.signKeyPair
+      )
     })
 
     it('returns public keys and device encrypted private keys for group owner', async () => {
@@ -901,7 +903,8 @@ describe('Actions', () => {
       expect(db.getGroup).toBeCalledWith(groupId)
       expect(primitives.cryptTransform).toBeCalledWith(
         deviceCryptTransformKey,
-        groupEncCryptPrivKey
+        groupEncCryptPrivKey,
+        service.signKeyPair
       )
     })
 
@@ -951,7 +954,8 @@ describe('Actions', () => {
       expect(db.getMembership).toBeCalledWith(groupId, userId)
       expect(primitives.cryptTransform).toBeCalledWith(
         deviceCryptTransformKey,
-        memberGroupEncCryptPrivKey
+        memberGroupEncCryptPrivKey,
+        service.signKeyPair
       )
     })
 

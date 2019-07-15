@@ -14,17 +14,22 @@ export class AddMemberToGroup extends ActionHandler {
   }
 
   async execute(service: LocalService) {
-    await service.db.putMembership({
+    const existing = await service.db.getMembership(this.payload.groupId, this.payload.userId)
+    const membership: MembershipRecord = {
+      canSign: false,
+      cryptTransformKey: '',
+      encGroupCryptPrivKey: '',
+      ...existing,
       groupId: this.payload.groupId,
-      userId: this.payload.userId,
-      cryptTransformKey: this.payload.cryptTransformKey,
+      userId: this.payload.userId
+    }
 
-      signPubKey: this.payload.signPubKey,
-      encSignPrivKey: this.payload.encSignPrivKey,
-      signTransformToUserId: this.payload.signTransformToUserId,
-      signTransformKey: this.payload.signTransformKey,
-      encGroupCryptPrivKey: ''
-    })
+    if ('cryptTransformKey' in this.payload) {
+      membership.cryptTransformKey = this.payload.cryptTransformKey
+    }
+    if ('canSign' in this.payload) membership.canSign = this.payload.canSign || false
+
+    await service.db.putMembership(membership)
     return this.payload as AddMemberToGroupResult
   }
 }

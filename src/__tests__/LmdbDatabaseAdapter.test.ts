@@ -32,7 +32,8 @@ describe('LmdbDatabaseAdapter', () => {
       id: 'documentId',
       userId: 'userId',
       cryptPubKey: 'cryptPubKey',
-      encCryptPrivKey: 'encCryptPrivKey'
+      encCryptPrivKey: 'encCryptPrivKey',
+      encSignPrivKey: 'encSignPrivKey'
     }
     const soul = 'testsoul'
 
@@ -60,7 +61,8 @@ describe('LmdbDatabaseAdapter', () => {
         id: 'documentId',
         userId: 'userId',
         cryptPubKey: 'cryptPubKey',
-        encCryptPrivKey: 'encCryptPrivKey'
+        encCryptPrivKey: 'encCryptPrivKey',
+        encSignPrivKey: 'encSignPrivKey'
       }
 
       expect(await db.put('', record)).toEqual(undefined)
@@ -81,7 +83,8 @@ describe('LmdbDatabaseAdapter', () => {
         userId: 'testUserId',
         cryptPubKey: 'cryptPubKey',
 
-        encCryptPrivKey: 'doesntmatter'
+        encCryptPrivKey: 'encCryptPrivKey',
+        encSignPrivKey: 'encSignPrivKey'
       }
 
       const someOtherDoc = {
@@ -89,7 +92,8 @@ describe('LmdbDatabaseAdapter', () => {
         userId: 'testUserId',
         cryptPubKey: 'cryptPubKey',
 
-        encCryptPrivKey: 'doesntmatter'
+        encCryptPrivKey: 'encCryptPrivKey',
+        encSignPrivKey: 'encSignPrivKey'
       }
 
       const expectedGrants = [

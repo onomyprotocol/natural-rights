@@ -1,4 +1,5 @@
 import { Client } from '../Client'
+import { SEA } from '../SEA'
 
 describe('Client', () => {
   let service: ServiceInterface
@@ -20,6 +21,7 @@ describe('Client', () => {
 
   beforeEach(() => {
     service = {
+      sea: SEA,
       primitives: {
         cryptKeyGen: jest.fn().mockResolvedValue({
           privKey: 'cryptPrivKey',
@@ -158,8 +160,16 @@ describe('Client', () => {
     it('uses Encrypt to encrypt private keys', async () => {
       const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
       await client.initializeUser()
-      expect(service.primitives.encrypt).toHaveBeenCalledWith('cryptPubKey', 'signPrivKey')
-      expect(service.primitives.encrypt).toHaveBeenCalledWith('cryptPubKey', 'cryptPrivKey')
+      expect(service.primitives.encrypt).toHaveBeenCalledWith(
+        'cryptPubKey',
+        'signPrivKey',
+        deviceSignKeyPair
+      )
+      expect(service.primitives.encrypt).toHaveBeenCalledWith(
+        'cryptPubKey',
+        'cryptPrivKey',
+        deviceSignKeyPair
+      )
     })
 
     it('makes a request including userId, public keys and encrypted private keys', async () => {
@@ -263,7 +273,11 @@ describe('Client', () => {
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
 
       await client.createGroup()
-      expect(service.primitives.encrypt).toHaveBeenCalledWith(userPubKey, 'cryptPrivKey')
+      expect(service.primitives.encrypt).toHaveBeenCalledWith(
+        userPubKey,
+        'cryptPrivKey',
+        deviceSignKeyPair
+      )
     })
 
     it('makes a request with publicKey, userId, encryptedPrivateKey', async () => {
@@ -334,7 +348,8 @@ describe('Client', () => {
       expect(client.getEncryptionKeyPair).toHaveBeenCalledWith('group', groupId)
       expect(client.service.primitives.cryptTransformKeyGen).toHaveBeenCalledWith(
         groupCryptKeyPair,
-        memberPubKey
+        memberPubKey,
+        deviceSignKeyPair
       )
 
       expect(client.request).toHaveBeenCalledWith([
@@ -398,11 +413,13 @@ describe('Client', () => {
       expect(client.getEncryptionKeyPair).toHaveBeenCalledWith('group', groupId)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
         memberPubKey,
-        groupCryptKeyPair.privKey
+        groupCryptKeyPair.privKey,
+        deviceSignKeyPair
       )
       expect(client.service.primitives.cryptTransformKeyGen).toHaveBeenCalledWith(
         groupCryptKeyPair,
-        memberPubKey
+        memberPubKey,
+        deviceSignKeyPair
       )
 
       expect(client.request).toHaveBeenCalledWith([
@@ -411,7 +428,8 @@ describe('Client', () => {
           payload: {
             cryptTransformKey: 'transform:groupCryptPrivKey:memberCryptPubKey',
             groupId,
-            userId: toAddId
+            userId: toAddId,
+            canSign: true
           }
         },
         {
@@ -462,34 +480,38 @@ describe('Client', () => {
         pubKey: 'docSignPubKey'
       }
       const documentId = expectedSignKeyPair.pubKey
-      client.service.primitives.signKeyGen = jest.fn().mockResolvedValue(expectedSignKeyPair)
+      client.service.sea.signKeyGen = jest.fn().mockResolvedValue(expectedSignKeyPair)
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
-        results: []
+        results: [
+          {
+            type: 'CreateDocument',
+            payload: {
+              documentId
+            }
+          }
+        ]
       })
 
       const doc = await client.createDocument()
 
       expect(client.service.primitives.cryptKeyGen).toHaveBeenCalled()
-      expect(client.service.primitives.signKeyGen).toHaveBeenCalled()
       expect(doc.cryptKeyPair).toEqual(expectedCryptKeyPair)
-      expect(doc.signKeyPair).toEqual(expectedSignKeyPair)
       expect(doc.id).toEqual(documentId)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
         userPubKey,
-        expectedCryptKeyPair.privKey
+        expectedCryptKeyPair.privKey,
+        deviceSignKeyPair
       )
 
       expect(client.request).toHaveBeenCalledWith([
         {
-          type: 'EncryptDocument',
+          type: 'CreateDocument',
           payload: {
-            documentId,
             cryptUserId: userId,
-            signUserId: userId,
+            creatorId: userId,
 
-            encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey',
-            encSignPrivKey: `encrypted:${userPubKey}:${expectedSignKeyPair.privKey}`
+            encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey'
           }
         }
       ])
@@ -514,7 +536,11 @@ describe('Client', () => {
 
       expect(client.getEncryptionPublicKey).toHaveBeenCalledWith(granteeKind, granteeId)
       expect(client.decryptDocumentEncryptionKey).toHaveBeenCalledWith(documentId)
-      expect(service.primitives.encrypt).toHaveBeenCalledWith(granteePubKey, docCryptPrivKey)
+      expect(service.primitives.encrypt).toHaveBeenCalledWith(
+        granteePubKey,
+        docCryptPrivKey,
+        deviceSignKeyPair
+      )
 
       expect(client.request).toHaveBeenCalledWith([
         {
@@ -623,13 +649,14 @@ describe('Client', () => {
         results: []
       })
 
-      const docCryptKeyPair = await client.updateDocument(documentId)
+      const docCryptKeyPair = await client.updateDocumentEncryption(documentId)
 
       expect(client.service.primitives.cryptKeyGen).toHaveBeenCalled()
       expect(docCryptKeyPair).toEqual(expectedCryptKeyPair)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
         userPubKey,
-        docCryptKeyPair.privKey
+        docCryptKeyPair.privKey,
+        deviceSignKeyPair
       )
 
       expect(client.request).toHaveBeenCalledWith([

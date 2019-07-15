@@ -1,6 +1,7 @@
 import { LocalService } from '../LocalService'
 import { ActionHandler } from '../actions/ActionHandler'
-import { EncryptDocument } from '../actions'
+import { CreateDocument } from '../actions'
+import { SEA } from '../SEA'
 
 describe('LocalService', () => {
   let primitives: PrimitivesInterface
@@ -38,7 +39,7 @@ describe('LocalService', () => {
       close: jest.fn()
     }
 
-    service = new LocalService(primitives, dbAdapter)
+    service = new LocalService(primitives, SEA, dbAdapter)
     db = service.db
   })
 
@@ -217,7 +218,7 @@ describe('LocalService', () => {
   describe('request', () => {
     const actions = [
       {
-        type: 'EncryptDocument',
+        type: 'CreateDocument',
         payload: {
           documentId: 'testDocumentId',
           userId: 'testUserId',
@@ -271,7 +272,7 @@ describe('LocalService', () => {
     const userId = 'testUserId'
     const deviceId = 'testDeviceId'
     const action = {
-      type: 'EncryptDocument',
+      type: 'CreateDocument',
       payload: {
         documentId: 'testDocumentId',
         userId: 'testUserId',
@@ -293,7 +294,7 @@ describe('LocalService', () => {
 
     it('returns ActionHandler instance if type is valid', async () => {
       expect(service.getActionHandler(request, action)).toEqual(
-        new EncryptDocument(userId, deviceId, action.payload)
+        new CreateDocument(userId, deviceId, action.payload)
       )
     })
   })
@@ -303,7 +304,7 @@ describe('LocalService', () => {
     const deviceId = 'testDeviceId'
     const handler = new ActionHandler(userId, deviceId)
     const action = {
-      type: 'EncryptDocument',
+      type: 'CreateDocument',
       payload: {
         documentId: 'testDocumentId',
         userId: 'testUserId',
@@ -574,7 +575,8 @@ describe('LocalService', () => {
       expect(service.getCredentials).toBeCalledWith(userId, documentId)
       expect(primitives.cryptTransform).toBeCalledWith(
         membership.cryptTransformKey,
-        grant.encCryptPrivKey
+        grant.encCryptPrivKey,
+        service.signKeyPair
       )
     })
   })
@@ -627,7 +629,8 @@ describe('LocalService', () => {
       expect(service.getUserDocumentDecryptKey).toBeCalledWith(userId, documentId)
       expect(primitives.cryptTransform).toBeCalledWith(
         deviceRecord.cryptTransformKey,
-        userEncCryptPrivKey
+        userEncCryptPrivKey,
+        service.signKeyPair
       )
     })
   })

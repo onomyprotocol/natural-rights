@@ -29,11 +29,13 @@ export class GetKeyPairs extends ActionHandler {
         signPubKey: user.signPubKey,
         encCryptPrivKey: await service.primitives.cryptTransform(
           device.cryptTransformKey,
-          user.encCryptPrivKey
+          user.encCryptPrivKey,
+          service.signKeyPair!
         ),
         encSignPrivKey: await service.primitives.cryptTransform(
           device.cryptTransformKey,
-          user.encSignPrivKey
+          user.encSignPrivKey,
+          service.signKeyPair!
         )
       } as GetKeyPairsResult
     } else if (this.payload.kind === 'group') {
@@ -53,7 +55,8 @@ export class GetKeyPairs extends ActionHandler {
         cryptPubKey: group.cryptPubKey,
         encCryptPrivKey: await service.primitives.cryptTransform(
           device.cryptTransformKey,
-          encCryptPrivKey
+          encCryptPrivKey,
+          service.signKeyPair!
         ),
         signPubKey: '',
         encSignPrivKey: ''

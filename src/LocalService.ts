@@ -9,10 +9,17 @@ function isValidActionType(type: string): type is keyof typeof actions {
 export class LocalService implements ServiceInterface {
   db: Database
   primitives: PrimitivesInterface
+  sea: SEAPrimitivesInterface
+  signKeyPair?: KeyPair // TODO initialize/track
 
-  constructor(primitives: PrimitivesInterface, adapter: DatabaseAdapterInterface) {
+  constructor(
+    primitives: PrimitivesInterface,
+    sea: SEAPrimitivesInterface,
+    adapter: DatabaseAdapterInterface
+  ) {
     this.primitives = primitives
     this.db = new Database(adapter)
+    this.sea = sea
   }
 
   getActionHandler(req: NaturalRightsRequest, action: Action<any>) {
@@ -121,11 +128,6 @@ export class LocalService implements ServiceInterface {
     }
   }
 
-  async getWriteCredentials(userId: string, documentId: string) {
-    const credentials = await this.getCredentials(userId, documentId)
-    if (!credentials) return credentials
-  }
-
   async getUserDocumentDecryptKey(userId: string, documentId: string) {
     const credentials = await this.getCredentials(userId, documentId)
     if (!credentials) return ''
@@ -133,7 +135,8 @@ export class LocalService implements ServiceInterface {
     if (!credentials.membership) return credentials.grant.encCryptPrivKey
     return this.primitives.cryptTransform(
       credentials.membership.cryptTransformKey,
-      credentials.grant.encCryptPrivKey
+      credentials.grant.encCryptPrivKey,
+      this.signKeyPair!
     )
   }
 
@@ -143,14 +146,20 @@ export class LocalService implements ServiceInterface {
       this.db.getDevice(userId, deviceId)
     ])
     if (!userKey || !device || !device.cryptTransformKey) return ''
-    return this.primitives.cryptTransform(device.cryptTransformKey, userKey)
+    return this.primitives.cryptTransform(device.cryptTransformKey, userKey, this.signKeyPair!)
   }
 
   async getHasReadAccess(userId: string, documentId: string) {
     return !!(await this.getUserDocumentDecryptKey(userId, documentId))
   }
 
-  async getHasWriteAccess(userId: string, documentId: string) {
-    return !!(await this.getWriteCredentials(userId, documentId))
+  async getHasSignAccess(userId: string, documentId: string) {
+    const credentials = await this.getCredentials(userId, documentId)
+    if (!credentials) return false
+    const { document, membership, grant } = credentials
+    if (document.creatorId === userId) return true
+    if (!grant || !grant.canSign) return false
+    if (membership) return membership.canSign
+    return grant.canSign
   }
 }

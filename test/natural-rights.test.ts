@@ -1,5 +1,6 @@
 import { HttpServer, LocalService, LmdbDatabaseAdapter } from '../src/natural-rights-server'
 import { Client, RemoteHttpService } from '../src/natural-rights-client'
+import { SEA } from '../src/SEA'
 import { Primitives } from './DummyPrimitives'
 
 const path = require('path')
@@ -17,7 +18,7 @@ describe('Natural rights integration tests', () => {
     const deviceSignKeyPair = await Primitives.signKeyGen()
 
     return new Client(
-      new RemoteHttpService(Primitives, `http://localhost:${port}`),
+      new RemoteHttpService(Primitives, SEA, `http://localhost:${port}`),
       '',
       deviceId,
       deviceCryptKeyPair,
@@ -32,10 +33,13 @@ describe('Natural rights integration tests', () => {
         mkdirp(testDirPath, (err: any) => (err ? fail(err) : ok()))
       })
     )
+    const serverKeyPair = await Primitives.signKeyGen()
     adapter = new LmdbDatabaseAdapter({
       path: testDirPath
     })
-    listener = new HttpServer(new LocalService(Primitives, adapter)).listen(port, '127.0.0.1')
+    const service = new LocalService(Primitives, SEA, adapter)
+    service.signKeyPair = serverKeyPair
+    listener = new HttpServer(service).listen(port, '127.0.0.1')
   })
 
   afterEach(async () => {
@@ -81,7 +85,7 @@ describe('Natural rights integration tests', () => {
       }
     })
 
-    it('allows alice to grant bob access to a document', async () => {
+    it('allows alice to grant bob read access to a document', async () => {
       const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
       await alice.grantReadAccess(documentId, 'user', bob.userId)
 
@@ -133,7 +137,7 @@ describe('Natural rights integration tests', () => {
       expect(bobSuccess).toEqual(false)
     })
 
-    it('allows bob to grant carol access to a document he is given access to from alice', async () => {
+    it('allows bob to grant carol read access to a document he is given read access to from alice', async () => {
       const { id: documentId, cryptKeyPair: docCryptKeyPair } = await alice.createDocument()
       await alice.grantReadAccess(documentId, 'user', bob.userId)
       await bob.grantReadAccess(documentId, 'user', carol.userId)

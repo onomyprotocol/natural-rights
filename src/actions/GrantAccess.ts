@@ -20,11 +20,7 @@ export class GrantAccess extends ActionHandler {
       this.payload.id
     )
     await service.db.putGrant({
-      signPubKey: '',
-      encSignPrivKey: '',
-      signTransformToKind: 'user',
-      signTransformToId: '',
-      signTransformKey: '',
+      canSign: false,
       ...existing,
       ...this.payload
     })

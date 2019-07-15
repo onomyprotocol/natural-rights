@@ -18,6 +18,7 @@ export class InitializeUser extends ActionHandler {
   async execute(service: LocalService) {
     await service.db.putUser({
       id: this.payload.userId,
+      signPubKey: this.payload.signPubKey,
       cryptPubKey: this.payload.cryptPubKey,
       encCryptPrivKey: this.payload.encCryptPrivKey,
       encSignPrivKey: this.payload.encSignPrivKey
