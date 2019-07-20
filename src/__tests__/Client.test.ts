@@ -481,6 +481,7 @@ describe('Client', () => {
       }
       const documentId = expectedSignKeyPair.pubKey
       client.service.sea.signKeyGen = jest.fn().mockResolvedValue(expectedSignKeyPair)
+      client.service.sea.cryptKeyGen = jest.fn().mockResolvedValue(expectedCryptKeyPair)
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
         results: [
@@ -495,7 +496,7 @@ describe('Client', () => {
 
       const doc = await client.createDocument()
 
-      expect(client.service.primitives.cryptKeyGen).toHaveBeenCalled()
+      expect(client.service.sea.cryptKeyGen).toHaveBeenCalled()
       expect(doc.cryptKeyPair).toEqual(expectedCryptKeyPair)
       expect(doc.id).toEqual(documentId)
       expect(client.service.primitives.encrypt).toHaveBeenCalledWith(
@@ -511,6 +512,7 @@ describe('Client', () => {
             cryptUserId: userId,
             creatorId: userId,
 
+            cryptPubKey: expectedCryptKeyPair.pubKey,
             encCryptPrivKey: 'encrypted:userPubKey:cryptPrivKey'
           }
         }

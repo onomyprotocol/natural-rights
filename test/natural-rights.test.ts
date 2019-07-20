@@ -1,6 +1,7 @@
 import { HttpServer, LocalService, LmdbDatabaseAdapter } from '../src/natural-rights-server'
 import { Client, RemoteHttpService } from '../src/natural-rights-client'
 import { SEA } from '../src/SEA'
+import { GUN } from '../src/GUN'
 import { Primitives } from './DummyPrimitives'
 
 const path = require('path')
@@ -287,6 +288,24 @@ describe('Natural rights integration tests', () => {
         ])
       }
       expect(bobSuccess).toEqual(false)
+    })
+
+    describe('Gun integration', () => {
+      describe('toSignedNode', () => {
+        it('Encrypts and signs node data to be verified by SEA', async () => {
+          const { id: documentId } = await alice.createDocument()
+          const nodeData = {
+            foo: 'barbaz',
+            edge: { '#': 'someothersoul' }
+          }
+          const signedNode = await GUN.toSignedNode(alice, documentId, nodeData)
+          expect(await SEA.verifyNode(signedNode)).toEqual(true)
+
+          const encrypted = await SEA.readNodeKey(signedNode, 'foo', documentId)
+          const [decrypted] = await alice.decryptDocumentTexts(documentId, [encrypted])
+          expect(decrypted).toEqual(nodeData.foo)
+        })
+      })
     })
   })
 })

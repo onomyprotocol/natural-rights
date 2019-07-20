@@ -32,6 +32,17 @@ export class GetPubKeys extends ActionHandler {
         cryptPubKey: group.cryptPubKey,
         signPubKey: ''
       } as GetPubKeysResult
+    } else if (this.payload.kind === 'document') {
+      const doc = await service.db.getDocument(this.payload.id)
+      if (!doc) throw new Error('Document does not exist')
+
+      console.log('doc', doc)
+
+      return {
+        ...this.payload,
+        cryptPubKey: doc.cryptPubKey,
+        signPubKey: doc.id
+      } as GetPubKeysResult
     }
 
     throw new Error('Unexpected GetPubKeys kind')

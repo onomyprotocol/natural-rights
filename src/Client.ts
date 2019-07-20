@@ -268,7 +268,8 @@ export class Client implements ClientInterface {
 
   async createDocument() {
     const userCryptPubKey = await this.getEncryptionPublicKey('user', this.userId)
-    const docCryptKeyPair = await this.service.primitives.cryptKeyGen()
+    const docCryptKeyPair = await this.service.sea.cryptKeyGen()
+
     const encCryptPrivKey = await this.service.primitives.encrypt(
       userCryptPubKey,
       docCryptKeyPair.privKey,
@@ -282,6 +283,7 @@ export class Client implements ClientInterface {
           cryptUserId: this.userId,
           creatorId: this.userId,
 
+          cryptPubKey: docCryptKeyPair.pubKey,
           encCryptPrivKey
         }
       }
@@ -381,8 +383,7 @@ export class Client implements ClientInterface {
     return docCryptKeyPair
   }
 
-  async signDocumentTexts(documentId: string, textsToSign: string[]) {
-    const hashes = await Promise.all(textsToSign.map(this.service.sea.hashForSignature))
+  async signDocumentHashes(documentId: string, hashes: string[]) {
     const response = await this.request([
       {
         type: 'SignDocument',
@@ -397,15 +398,20 @@ export class Client implements ClientInterface {
     return (result.payload as SignDocumentResult).signatures
   }
 
+  async signDocumentTexts(documentId: string, textsToSign: string[]) {
+    const hashes = await Promise.all(textsToSign.map(this.service.sea.hashForSignature))
+    return this.signDocumentHashes(documentId, hashes)
+  }
+
   async decryptDocumentTexts(documentId: string, ciphertexts: string[]) {
     const privKey = await this.decryptDocumentEncryptionKey(documentId)
-    const keyPair = {
-      pubKey: '', // TODO get pubkey
-      privKey
-    }
-    return Promise.all(
-      ciphertexts.map(ciphertext => this.service.primitives.decrypt(keyPair, ciphertext))
-    )
+    return Promise.all(ciphertexts.map(ciphertext => this.service.sea.decrypt(privKey, ciphertext)))
+  }
+
+  async encryptDocumentTexts(documentId: string, plaintexts: string[]) {
+    const privKey = await this.decryptDocumentEncryptionKey(documentId)
+    if (!privKey) throw new Error('No document access')
+    return Promise.all(plaintexts.map(text => this.service.sea.encrypt(privKey, text)))
   }
 
   async getPublicKeys(kind: SignatureKind, id: string) {

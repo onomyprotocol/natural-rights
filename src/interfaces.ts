@@ -30,8 +30,10 @@ interface ClientInterface {
   grantSignAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
   revokeAccess: (documentId: string, kind: GrantKind, id: string) => Promise<void>
 
+  signDocumentHashes: (documentId: string, hashesToSign: string[]) => Promise<string[]> // signature as document id from proxy
   signDocumentTexts: (documentId: string, textsToSign: string[]) => Promise<string[]> // signature as document id from proxy
 
+  encryptDocumentTexts: (documentId: string, ciphertexts: string[]) => Promise<string[]>
   decryptDocumentTexts: (documentId: string, ciphertexts: string[]) => Promise<string[]>
 
   decryptDocumentEncryptionKey: (documentId: string) => Promise<string>
@@ -69,6 +71,12 @@ interface SEAPrimitivesInterface {
   hashForSignature: (text: string) => Promise<string>
   signHash: (hash: string, signKeyPair: KeyPair) => Promise<string>
   verifyHashSignature: (hash: string, signature: string, pubKey: string) => Promise<boolean>
+  cryptKeyGen: () => Promise<KeyPair>
+  encrypt: (pubKey: string, plaintext: string) => Promise<string>
+  decrypt: (privKey: string, ciphertext: string) => Promise<string>
+  readNodeKey: (node: any, key: string, pair: string | boolean) => Promise<any>
+  hashNodeKey: (node: any, key: string) => Promise<string>
+  verifyNode: (node: any) => Promise<boolean>
 }
 
 interface ServiceInterface {
