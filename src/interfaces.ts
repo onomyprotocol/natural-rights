@@ -233,8 +233,6 @@ interface DocumentRecord {
   creatorId: string
 
   signPrivKey: string
-
-  // delSignPrivKey: string // private key managed by proxy when delegated rather than re-signed
 }
 
 interface GrantRecord {

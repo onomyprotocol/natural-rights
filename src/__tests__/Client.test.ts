@@ -4,7 +4,6 @@ import { SEA } from '../SEA'
 describe('Client', () => {
   let service: ServiceInterface
   const userId = 'testuserid'
-  const deviceId = 'testdeviceid'
   const userCryptKeyPair = {
     privKey: 'userCryptPrivKey',
     pubKey: 'userCryptPubKey'
@@ -13,11 +12,11 @@ describe('Client', () => {
     privKey: 'deviceCryptPrivKey',
     pubKey: 'deviceCryptPubKey'
   }
-
   const deviceSignKeyPair = {
     privKey: 'deviceSignPrivKey',
     pubKey: 'deviceSignPubKey'
   }
+  const deviceId = deviceSignKeyPair.pubKey
 
   beforeEach(() => {
     service = {
@@ -52,7 +51,7 @@ describe('Client', () => {
     it('stringifies and signs passed actions', async () => {
       const expectedSignature = 'signature'
       service.primitives.sign = jest.fn().mockResolvedValue(expectedSignature)
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const actions = [
         {
           type: 'GrantAccess',
@@ -76,7 +75,7 @@ describe('Client', () => {
 
   describe('request', () => {
     it('signs passed actions and sends request to service', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const expectedRequest = {
         userId,
         deviceId,
@@ -101,7 +100,7 @@ describe('Client', () => {
     })
 
     it('throws errors if encountered in response', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const errors = [
         {
           type: 'GrantAccess',
@@ -146,19 +145,19 @@ describe('Client', () => {
 
   describe('initializeUser', () => {
     it('uses cryptKeyGen to generate encryption key pair', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       await client.initializeUser()
       expect(service.primitives.cryptKeyGen).toHaveBeenCalled()
     })
 
     it('uses signKeyGen to generate signing key pair', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       await client.initializeUser()
       expect(service.primitives.cryptKeyGen).toHaveBeenCalled()
     })
 
     it('uses Encrypt to encrypt private keys', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       await client.initializeUser()
       expect(service.primitives.encrypt).toHaveBeenCalledWith(
         'cryptPubKey',
@@ -173,7 +172,7 @@ describe('Client', () => {
     })
 
     it('makes a request including userId, public keys and encrypted private keys', async () => {
-      const client = new Client(service, '', deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, '', deviceCryptKeyPair, deviceSignKeyPair)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
@@ -211,7 +210,7 @@ describe('Client', () => {
 
   describe('addDevice', () => {
     it('makes a request including userId, deviceId, public and transform keys', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       client.request = jest.fn().mockResolvedValue({
         results: []
       })
@@ -238,7 +237,7 @@ describe('Client', () => {
 
   describe('removeDevice', () => {
     it('makes a request including userId and deviceId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const toRemoveId = 'removeDeviceId'
       client.request = jest.fn().mockResolvedValue({
         results: []
@@ -259,7 +258,7 @@ describe('Client', () => {
 
   describe('createGroup', () => {
     it('uses KeyGen to generate encryption key pair', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userEncPubKey'
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
 
@@ -268,7 +267,7 @@ describe('Client', () => {
     })
 
     it('encrypts private key to owning user pub key', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userEncPubKey'
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
 
@@ -281,7 +280,7 @@ describe('Client', () => {
     })
 
     it('makes a request with publicKey, userId, encryptedPrivateKey', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userCryptPubKey'
       client.getEncryptionPublicKey = jest.fn().mockResolvedValue(userPubKey)
       client.request = jest.fn().mockResolvedValue({
@@ -328,7 +327,7 @@ describe('Client', () => {
 
   describe('addReaderToGroup', () => {
     it('uses cryptTransformKeyGen for Group->Member to build cryptTransformKey', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const groupId = 'testgroupid'
       const memberId = 'memberuserid'
       const memberPubKey = 'memberCryptPubKey'
@@ -367,7 +366,7 @@ describe('Client', () => {
 
   describe('removeMemberFromGroup', () => {
     it('makes a request including requesting userId and groupId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const toRemoveId = 'removeMemberId'
       const groupId = 'groupId'
       client.request = jest.fn().mockResolvedValue({
@@ -393,7 +392,7 @@ describe('Client', () => {
 
   describe('addAdminToGroup', () => {
     it('makes a request including userId, groupId, and encrypted private keys', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const memberPubKey = 'memberCryptPubKey'
       const groupCryptKeyPair = {
         privKey: 'groupCryptPrivKey',
@@ -446,7 +445,7 @@ describe('Client', () => {
 
   describe('removeAdminFromGroup', () => {
     it('makes a request including userId and groupId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const toRemoveId = 'removeAdminId'
       const groupId = 'groupId'
       client.request = jest.fn().mockResolvedValue({
@@ -469,7 +468,7 @@ describe('Client', () => {
 
   describe('createDocument', () => {
     it('generates an encryption keypair and registers it with service', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userPubKey'
       const expectedCryptKeyPair = {
         privKey: 'cryptPrivKey',
@@ -522,7 +521,7 @@ describe('Client', () => {
 
   describe('grantReadAccess', () => {
     it('makes a request including documentId, encrypted decryption key and userId or groupId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const documentId = 'testDocumentId'
       const granteeId = 'testGranteeId'
       const granteeKind = 'user'
@@ -560,7 +559,7 @@ describe('Client', () => {
 
   describe('decryptDocumentKey', () => {
     it('makes a request including documentId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const documentId = 'testDocumentId'
       const encCryptPrivKey = 'documentEncCryptPrivKey'
       const cryptPrivKey = 'decryptedDocumentCryptPrivKey'
@@ -612,7 +611,7 @@ describe('Client', () => {
 
   describe('revokeAccess', () => {
     it('makes a request including documentId and userId', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const toRemoveId = 'removeAdminId'
       const documentId = 'documentId'
       client.request = jest.fn().mockResolvedValue({
@@ -639,7 +638,7 @@ describe('Client', () => {
 
   describe('updateDocument', () => {
     it('generates an encryption keypair and registers it with service', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const userPubKey = 'userPubKey'
       const documentId = 'testdocumentid'
       const expectedCryptKeyPair = {
@@ -677,7 +676,7 @@ describe('Client', () => {
 
   describe('getPublicKeys', () => {
     it('makes a request asking for public keys', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
       const cryptPubKey = 'userCryptPubKey'
       const signPubKey = 'userSignPubKey'
@@ -726,7 +725,7 @@ describe('Client', () => {
 
   describe('getKeyPairs', () => {
     it('makes a request asking for key pairs', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
       const cryptPubKey = 'userCryptPubKey'
       const signPubKey = 'userSignPubKey'
@@ -781,7 +780,7 @@ describe('Client', () => {
 
   describe('getEncryptionPublicKey', () => {
     it('resolves encryption public key if available', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
       const cryptPubKey = 'userCryptPubKey'
       const signPubKey = 'userSignPubKey'
@@ -803,7 +802,7 @@ describe('Client', () => {
 
   describe('getEncryptionKeyPair', () => {
     it('resolves encryption key pair if available', async () => {
-      const client = new Client(service, userId, deviceId, deviceCryptKeyPair, deviceSignKeyPair)
+      const client = new Client(service, userId, deviceCryptKeyPair, deviceSignKeyPair)
       const testUserId = 'testUserId'
       const cryptPubKey = 'userCryptPubKey'
       const signPubKey = 'userSignPubKey'

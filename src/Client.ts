@@ -8,15 +8,14 @@ export class Client implements ClientInterface {
   constructor(
     service: ServiceInterface,
     userId: string,
-    deviceId: string,
     deviceCryptKeyPair: KeyPair,
     deviceSignKeyPair: KeyPair
   ) {
     this.service = service
     this.userId = userId
-    this.deviceId = deviceId
     this.deviceCryptKeyPair = deviceCryptKeyPair
     this.deviceSignKeyPair = deviceSignKeyPair
+    this.deviceId = deviceSignKeyPair.pubKey
   }
 
   async sign(actions: NaturalRightsAction[]) {

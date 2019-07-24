@@ -26,6 +26,8 @@ export default {
     'express',
     'body-parser',
     `gun`,
+    `gun/gun`,
+    `gun/sea`,
     'gun/sea/shim',
     'gun/sea/sha256',
     'gun/sea/settings'

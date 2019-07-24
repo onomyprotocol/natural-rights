@@ -1,4 +1,4 @@
-const Gun = require('gun')
+const Gun = require('gun/gun')
 const shimBase = require('gun/sea/shim')
 const sha256 = require('gun/sea/sha256')
 const settings = require('gun/sea/settings')

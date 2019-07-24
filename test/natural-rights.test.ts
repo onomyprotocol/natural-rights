@@ -14,14 +14,13 @@ describe('Natural rights integration tests', () => {
   let adapter: LmdbDatabaseAdapter
   let listener: any
 
-  async function connect(userId: string, deviceId: string) {
+  async function connect(userId: string) {
     const deviceCryptKeyPair = await Primitives.cryptKeyGen()
     const deviceSignKeyPair = await Primitives.signKeyGen()
 
     return new Client(
       new RemoteHttpService(Primitives, SEA, `http://localhost:${port}`),
       '',
-      deviceId,
       deviceCryptKeyPair,
       deviceSignKeyPair
     )
@@ -57,28 +56,16 @@ describe('Natural rights integration tests', () => {
 
     beforeEach(async () => {
       try {
-        alice = await connect(
-          'alice',
-          'mainDevice'
-        )
+        alice = await connect('alice')
         await alice.initializeUser()
 
-        bob = await connect(
-          'bob',
-          'mainDevice'
-        )
+        bob = await connect('bob')
         await bob.initializeUser()
 
-        carol = await connect(
-          'carol',
-          'mainDevice'
-        )
+        carol = await connect('carol')
         await carol.initializeUser()
 
-        eve = await connect(
-          'eve',
-          'mainDevice'
-        )
+        eve = await connect('eve')
         await eve.initializeUser()
       } catch (e) {
         console.error(e.stack || e)
