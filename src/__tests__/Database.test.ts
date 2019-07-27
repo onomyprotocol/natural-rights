@@ -29,7 +29,8 @@ describe('Database', () => {
           signPubKey: '',
           cryptPubKey: '',
           encCryptPrivKey: '',
-          encSignPrivKey: ''
+          encSignPrivKey: '',
+          rootDocumentId: ''
         }
         dbAdapter.get = jest.fn().mockResolvedValue(userRecord)
 
@@ -57,7 +58,8 @@ describe('Database', () => {
           signPubKey: '',
           cryptPubKey: '',
           encCryptPrivKey: '',
-          encSignPrivKey: ''
+          encSignPrivKey: '',
+          rootDocumentId: ''
         }
 
         await db.putUser(userRecord)
@@ -82,7 +84,7 @@ describe('Database', () => {
       it('resolves a device record when present', async () => {
         const userId = 'testuserid'
         const deviceId = 'testdeviceid'
-        const expectedSoul = Souls.device(userId, deviceId)
+        const expectedSoul = Souls.device(deviceId)
         const deviceRecord: DeviceRecord = {
           id: deviceId,
           userId,
@@ -92,7 +94,7 @@ describe('Database', () => {
         }
         dbAdapter.get = jest.fn().mockResolvedValue(deviceRecord)
 
-        const result = await db.getDevice(userId, deviceId)
+        const result = await db.getDevice(deviceId)
         expect(dbAdapter.get).toBeCalledWith(expectedSoul)
         expect(result).toEqual(deviceRecord)
       })
@@ -102,7 +104,7 @@ describe('Database', () => {
       it('persists a device record via the adapter', async () => {
         const userId = 'testuserid'
         const deviceId = 'testdeviceid'
-        const expectedSoul = Souls.device(userId, deviceId)
+        const expectedSoul = Souls.device(deviceId)
         const deviceRecord: DeviceRecord = {
           id: deviceId,
           userId,
@@ -120,7 +122,7 @@ describe('Database', () => {
       it('deletes a device record and associated transformKey', async () => {
         const userId = 'testuserid'
         const deviceId = 'testdeviceid'
-        const expectedSoul = Souls.device(userId, deviceId)
+        const expectedSoul = Souls.device(deviceId)
 
         await db.deleteDevice(userId, deviceId)
         expect(dbAdapter.delete).toBeCalledWith(expectedSoul)

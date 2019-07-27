@@ -87,6 +87,7 @@ interface ServiceInterface {
 
 type ActionType =
   | 'InitializeUser'
+  | 'Login'
   | 'AddDevice'
   | 'RemoveDevice'
   | 'CreateGroup'
@@ -111,6 +112,7 @@ interface Action<T> {
 type ResultType =
   | null
   | InitializeUserResult
+  | LoginResult
   | AddDeviceResult
   | RemoveDeviceResult
   | CreateGroupResult
@@ -152,7 +154,7 @@ interface DatabaseInterface {
   getUser: (id: string) => Promise<UserRecord | null>
   putUser: (user: UserRecord) => Promise<void>
   deleteUser: (userId: string) => Promise<void>
-  getDevice: (userId: string, deviceId: string) => Promise<DeviceRecord | null>
+  getDevice: (deviceId: string) => Promise<DeviceRecord | null>
   putDevice: (device: DeviceRecord) => Promise<void>
   deleteDevice: (userId: string, deviceId: string) => Promise<void>
   getGroup: (groupId: string) => Promise<GroupRecord | null>
@@ -187,6 +189,7 @@ interface UserRecord {
   signPubKey: string
   encCryptPrivKey: string
   encSignPrivKey: string
+  rootDocumentId: string
 }
 
 interface DeviceRecord {
@@ -247,6 +250,7 @@ interface GrantRecord {
 
 type NaturalRightsAction = Action<
   | InitializeUserAction
+  | LoginAction
   | AddDeviceAction
   | RemoveDeviceAction
   | CreateGroupAction
@@ -281,9 +285,17 @@ interface InitializeUserAction {
   cryptPubKey: string
   encCryptPrivKey: string
   encSignPrivKey: string
+  rootDocCryptPubKey: string
+  rootDocEncCryptPrivKey: string
 }
 
 interface InitializeUserResult extends InitializeUserAction {}
+
+interface LoginAction {}
+interface LoginResult extends LoginAction {
+  rootDocumentId: string
+  userId: string
+}
 
 interface AddDeviceAction {
   deviceId: string

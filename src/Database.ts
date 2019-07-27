@@ -2,7 +2,7 @@ const PREFIX = ``
 
 export const Souls = {
   user: (userId: string) => `${PREFIX}/users/${userId}`,
-  device: (userId: string, deviceId: string) => `${PREFIX}/users/${userId}/devices/${deviceId}`,
+  device: (deviceId: string) => `${PREFIX}/devices/${deviceId}`,
   group: (groupId: string) => `${PREFIX}/groups/${groupId}`,
   membership: (groupId: string, userId: string) => `${PREFIX}/groups/${groupId}/members/${userId}`,
   document: (documentId: string) => `${PREFIX}/documents/${documentId}`,
@@ -36,20 +36,20 @@ export class Database implements DatabaseInterface {
     // TODO: Delete all documents?
   }
 
-  async getDevice(userId: string, deviceId: string) {
-    const soul = Souls.device(userId, deviceId)
+  async getDevice(deviceId: string) {
+    const soul = Souls.device(deviceId)
     const device = await this.adapter.get(soul)
     if (!device) return null
     return device as DeviceRecord
   }
 
   async putDevice(device: DeviceRecord) {
-    const soul = Souls.device(device.userId, device.id)
+    const soul = Souls.device(device.id)
     await this.adapter.put(soul, device)
   }
 
   async deleteDevice(userId: string, deviceId: string) {
-    const soul = Souls.device(userId, deviceId)
+    const soul = Souls.device(deviceId)
     await this.adapter.delete(soul)
   }
 

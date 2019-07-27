@@ -1,6 +1,10 @@
 import { HttpServer } from '../HttpServer'
 import { RemoteHttpService } from '../RemoteHttpService'
-import { SEA } from '../SEA'
+import { initSEA } from '../SEA'
+
+const Gun = require('gun/gun')
+require('gun/sea')
+const SEA = initSEA(Gun)
 
 describe('HttpServer', () => {
   const port = 4242

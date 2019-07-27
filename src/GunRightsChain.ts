@@ -1,26 +1,27 @@
 import { Client } from './Client'
-import { GUN } from './GUN'
+import { initGUN } from './GUN'
 import { RemoteHttpService } from './RemoteHttpService'
-import { SEA } from './SEA'
 
 type GunChain = any
 
 export class GunRightsChain {
+  GUN: any
   service: ServiceInterface
   client?: Client
   documentId: string
-  root: GunChain
+  _root: GunChain
   parent: GunChain
 
-  constructor(service: ServiceInterface, root: GunChain, parent: GunChain) {
+  constructor(GUN: any, service: ServiceInterface, root: GunChain, parent: GunChain) {
+    this.GUN = GUN
     this.service = service
-    this.root = root
+    this._root = root
     this.parent = parent
     this.documentId = GUN.getDocumentId(parent._.soul || '')
   }
 
   userId() {
-    const rights = this.root.rights()
+    const rights = this._root.rights()
     if (rights !== this) {
       return rights.userId()
     }
@@ -28,7 +29,7 @@ export class GunRightsChain {
   }
 
   getClient() {
-    const rights = this.root.rights()
+    const rights = this._root.rights()
     if (!rights.client) {
       debugger
       throw new Error('Not logged in')
@@ -36,8 +37,15 @@ export class GunRightsChain {
     return rights.client
   }
 
+  root() {
+    const client = this.getClient()
+    if (!client) return
+
+    return this.get(client.rootDocumentId)
+  }
+
   async signup() {
-    const rights = this.root.rights()
+    const rights = this._root.rights()
     if (rights !== this) {
       await rights.signup()
       return this
@@ -48,7 +56,7 @@ export class GunRightsChain {
     const deviceCryptKeyPair = await this.service.primitives.cryptKeyGen()
     const deviceSignKeyPair = await this.service.primitives.signKeyGen()
 
-    const newClient = new Client(this.service, '', deviceCryptKeyPair, deviceSignKeyPair)
+    const newClient = new Client(this.service, deviceCryptKeyPair, deviceSignKeyPair)
 
     await newClient.initializeUser()
     this.client = newClient
@@ -56,20 +64,20 @@ export class GunRightsChain {
   }
 
   async login(deviceCryptKeyPair: KeyPair, deviceSignKeyPair: KeyPair, userId: string) {
-    const rights = this.root.rights()
+    const rights = this._root.rights()
     if (rights !== this) {
       await rights.login(deviceCryptKeyPair, deviceSignKeyPair, userId)
       return this
     }
 
-    const newClient = new Client(this.service, userId, deviceCryptKeyPair, deviceSignKeyPair)
-    // await newClient.login()
+    const newClient = new Client(this.service, deviceCryptKeyPair, deviceSignKeyPair)
+    await newClient.login()
     this.client = newClient
     return this
   }
 
   async logout() {
-    const rights = this.root.rights()
+    const rights = this._root.rights()
     if (rights !== this) {
       await rights.logout()
       return this
@@ -130,8 +138,8 @@ export class GunRightsChain {
   }
 
   get(documentId: string) {
-    const soul = GUN.documentIdToSoul(documentId)
-    const chain = this.root.get(soul)
+    const soul = this.GUN.documentIdToSoul(documentId)
+    const chain = this._root.get(soul)
     return chain
   }
 
@@ -143,7 +151,7 @@ export class GunRightsChain {
     return (async () => {
       try {
         const { id } = await this.getClient().createDocument()
-        const soul = GUN.documentIdToSoul(id)
+        const soul = this.GUN.documentIdToSoul(id)
         cb(null, soul)
         return soul
       } catch (err) {
@@ -156,6 +164,9 @@ export class GunRightsChain {
 
 export function attachToGun(Gun: any, Primitives: PrimitivesInterface, url: string) {
   if (Gun.chain.rights) return
+
+  const GUN = initGUN(Gun)
+  const SEA = GUN.SEA
 
   const service = new RemoteHttpService(Primitives, SEA, url)
 
@@ -178,7 +189,7 @@ export function attachToGun(Gun: any, Primitives: PrimitivesInterface, url: stri
       return nr
     }
 
-    nr = new GunRightsChain(service, root, this)
+    nr = new GunRightsChain(GUN, service, root, this)
 
     if (this === root) {
       root._.naturalRights = nr

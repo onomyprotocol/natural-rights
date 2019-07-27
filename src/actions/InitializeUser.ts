@@ -16,13 +16,28 @@ export class InitializeUser extends ActionHandler {
   }
 
   async execute(service: LocalService) {
-    await service.db.putUser({
-      id: this.payload.userId,
-      signPubKey: this.payload.signPubKey,
-      cryptPubKey: this.payload.cryptPubKey,
-      encCryptPrivKey: this.payload.encCryptPrivKey,
-      encSignPrivKey: this.payload.encSignPrivKey
-    })
+    const rootDocSignKeyPair = await service.sea.signKeyGen()
+
+    await Promise.all([
+      service.db.putUser({
+        id: this.payload.userId,
+        signPubKey: this.payload.signPubKey,
+        cryptPubKey: this.payload.cryptPubKey,
+        encCryptPrivKey: this.payload.encCryptPrivKey,
+        encSignPrivKey: this.payload.encSignPrivKey,
+        rootDocumentId: rootDocSignKeyPair.pubKey
+      }),
+
+      service.db.putDocument({
+        // Private root document
+        id: rootDocSignKeyPair.pubKey,
+        cryptUserId: this.payload.userId,
+        cryptPubKey: this.payload.cryptPubKey,
+        encCryptPrivKey: this.payload.encCryptPrivKey,
+        creatorId: this.payload.userId,
+        signPrivKey: rootDocSignKeyPair.privKey
+      })
+    ])
 
     return this.payload as InitializeUserResult
   }

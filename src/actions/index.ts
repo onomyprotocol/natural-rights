@@ -1,4 +1,5 @@
 export { InitializeUser } from './InitializeUser'
+export { Login } from './Login'
 export { AddDevice } from './AddDevice'
 export { RemoveDevice } from './RemoveDevice'
 export { CreateGroup } from './CreateGroup'

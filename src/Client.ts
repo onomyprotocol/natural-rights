@@ -1,18 +1,15 @@
 export class Client implements ClientInterface {
   service: ServiceInterface
   userId: string
+  rootDocumentId: string
   deviceId: string
   deviceCryptKeyPair: KeyPair
   deviceSignKeyPair: KeyPair
 
-  constructor(
-    service: ServiceInterface,
-    userId: string,
-    deviceCryptKeyPair: KeyPair,
-    deviceSignKeyPair: KeyPair
-  ) {
+  constructor(service: ServiceInterface, deviceCryptKeyPair: KeyPair, deviceSignKeyPair: KeyPair) {
     this.service = service
-    this.userId = userId
+    this.userId = ''
+    this.rootDocumentId = ''
     this.deviceCryptKeyPair = deviceCryptKeyPair
     this.deviceSignKeyPair = deviceSignKeyPair
     this.deviceId = deviceSignKeyPair.pubKey
@@ -22,7 +19,6 @@ export class Client implements ClientInterface {
     const body = JSON.stringify(actions)
     const signature = await this.service.primitives.sign(this.deviceSignKeyPair, body)
     return {
-      userId: this.userId,
       deviceId: this.deviceId,
       body,
       signature
@@ -35,6 +31,21 @@ export class Client implements ClientInterface {
     const errors = getErrors(response)
     if (errors.length) throw errors
     return response
+  }
+
+  async login() {
+    const response = await this.request([
+      {
+        type: 'Login',
+        payload: {}
+      }
+    ])
+    const result = response.results.find(({ type }) => type === 'Login')
+    if (!result) throw new Error('No Login result')
+    const { rootDocumentId, userId } = result.payload as LoginResult
+    this.userId = userId
+    this.rootDocumentId = rootDocumentId
+    return { rootDocumentId, userId }
   }
 
   async initializeUser() {
@@ -56,6 +67,15 @@ export class Client implements ClientInterface {
       this.deviceSignKeyPair
     )
 
+    // Private root
+    const rootDocCryptKeyPair = await this.service.primitives.cryptKeyGen()
+
+    const rootDocEncCryptPrivKey = await this.service.primitives.encrypt(
+      userCryptKeyPair.pubKey,
+      rootDocCryptKeyPair.privKey,
+      this.deviceSignKeyPair
+    )
+
     this.userId = userSignKeyPair.pubKey
 
     await this.request([
@@ -65,7 +85,10 @@ export class Client implements ClientInterface {
           userId: this.userId,
           cryptPubKey: userCryptKeyPair.pubKey,
           encCryptPrivKey: userEncCryptPrivKey,
-          encSignPrivKey: userEncSignPrivKey
+          encSignPrivKey: userEncSignPrivKey,
+
+          rootDocCryptPubKey: rootDocCryptKeyPair.pubKey,
+          rootDocEncCryptPrivKey
         }
       },
       {
@@ -79,6 +102,7 @@ export class Client implements ClientInterface {
         }
       }
     ] as [Action<InitializeUserAction>, Action<AddDeviceAction>])
+    await this.login()
   }
 
   async addDevice(deviceId: string) {

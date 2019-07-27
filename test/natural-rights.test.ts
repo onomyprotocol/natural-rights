@@ -1,8 +1,11 @@
 import { HttpServer, LocalService, LmdbDatabaseAdapter } from '../src/natural-rights-server'
-import { Client, RemoteHttpService } from '../src/natural-rights-client'
-import { SEA } from '../src/SEA'
-import { GUN } from '../src/GUN'
+import { Client, RemoteHttpService, initGUN } from '../src/natural-rights-client'
 import { Primitives } from './DummyPrimitives'
+
+const Gun = require('gun/gun')
+require('gun/sea')
+const GUN = initGUN(Gun)
+const SEA = GUN.SEA
 
 const path = require('path')
 const rimraf = require('rimraf')
@@ -14,13 +17,12 @@ describe('Natural rights integration tests', () => {
   let adapter: LmdbDatabaseAdapter
   let listener: any
 
-  async function connect(userId: string) {
+  async function connect() {
     const deviceCryptKeyPair = await Primitives.cryptKeyGen()
     const deviceSignKeyPair = await Primitives.signKeyGen()
 
     return new Client(
       new RemoteHttpService(Primitives, SEA, `http://localhost:${port}`),
-      '',
       deviceCryptKeyPair,
       deviceSignKeyPair
     )
@@ -56,16 +58,16 @@ describe('Natural rights integration tests', () => {
 
     beforeEach(async () => {
       try {
-        alice = await connect('alice')
+        alice = await connect()
         await alice.initializeUser()
 
-        bob = await connect('bob')
+        bob = await connect()
         await bob.initializeUser()
 
-        carol = await connect('carol')
+        carol = await connect()
         await carol.initializeUser()
 
-        eve = await connect('eve')
+        eve = await connect()
         await eve.initializeUser()
       } catch (e) {
         console.error(e.stack || e)

@@ -1,7 +1,7 @@
 export { Client } from './Client'
 export { RemoteHttpService } from './RemoteHttpService'
-export { SEA } from './SEA'
-export { GUN, Gun } from './GUN'
+export { initSEA } from './SEA'
+export { initGUN } from './GUN'
 export { attachToGun } from './GunRightsChain'
 
 /*

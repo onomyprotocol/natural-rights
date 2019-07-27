@@ -43,20 +43,27 @@ export class LocalService implements ServiceInterface {
     const user = await this.db.getUser(initializeUser.userId)
     if (user) return false
 
-    return this.primitives.verify(addDevice.signPubKey, req.signature, req.body)
+    if (await this.primitives.verify(addDevice.signPubKey, req.signature, req.body)) {
+      return initializeUser.userId
+    }
+    return false
   }
 
   async authenticate(req: NaturalRightsRequest) {
-    const device = await this.db.getDevice(req.userId, req.deviceId)
+    const device = await this.db.getDevice(req.deviceId)
     if (!device || !device.signPubKey) return this.authenticateInitializeUser(req)
-    return this.primitives.verify(device.signPubKey, req.signature, req.body)
+    if (await this.primitives.verify(device.signPubKey, req.signature, req.body)) {
+      return device.userId
+    }
+    return false
   }
 
   async request(req: NaturalRightsRequest) {
     const results: Result[] = []
     const actions = this.parseRequestBody(req)
+    const userId = await this.authenticate(req)
 
-    if (!(await this.authenticate(req))) {
+    if (!userId) {
       return {
         results: actions.map(result => ({
           ...result,
@@ -65,6 +72,8 @@ export class LocalService implements ServiceInterface {
         }))
       } as NaturalRightsResponse
     }
+
+    req.userId = userId
 
     for (let action of actions) {
       results.push(await this.processAction(req, action))
@@ -143,7 +152,7 @@ export class LocalService implements ServiceInterface {
   async getDeviceDocumentDecryptKey(userId: string, deviceId: string, documentId: string) {
     const [userKey, device] = await Promise.all([
       this.getUserDocumentDecryptKey(userId, documentId),
-      this.db.getDevice(userId, deviceId)
+      this.db.getDevice(deviceId)
     ])
     if (!userKey || !device || !device.cryptTransformKey) return ''
     return this.primitives.cryptTransform(device.cryptTransformKey, userKey, this.signKeyPair!)

@@ -17,7 +17,11 @@ import {
 } from '../actions'
 import { ActionHandler } from '../actions/ActionHandler'
 import { LocalService } from '../LocalService'
-import { SEA } from '../SEA'
+import { initSEA } from '../SEA'
+
+const Gun = require('gun/gun')
+require('gun/sea')
+const SEA = initSEA(Gun)
 
 describe('Actions', () => {
   let primitives: PrimitivesInterface
@@ -84,7 +88,9 @@ describe('Actions', () => {
         cryptPubKey: 'cryptPubKey',
         signPubKey: 'signPubKey',
         encCryptPrivKey: 'encCryptPrivKey',
-        encSignPrivKey: 'encSignPrivKey'
+        encSignPrivKey: 'encSignPrivKey',
+        rootDocCryptPubKey: `rootDocCryptPubKey`,
+        rootDocEncCryptPrivKey: `rootDocEncCryptPrivKey`
       }
 
       const withMatch = new InitializeUser('userId', 'deviceId', {
@@ -113,15 +119,26 @@ describe('Actions', () => {
     it('persists UserRecord', async () => {
       const userId = 'testUserId'
       const deviceId = 'testDeviceId'
+      const documentId = 'testDocId'
+      const docSignPrivKey = 'testDocPrivKey'
       const shared = {
         signPubKey: 'signPubKey',
         cryptPubKey: 'cryptPubKey',
         encCryptPrivKey: 'encCryptPrivKey',
         encSignPrivKey: 'encSignPrivKey'
       }
-      const payload = { ...shared, userId }
-      const record = { ...shared, id: userId }
+      const payload = {
+        ...shared,
+        rootDocCryptPubKey: `rootDocCryptPubKey`,
+        rootDocEncCryptPrivKey: `rootDocEncCryptPrivKey`,
+        userId
+      }
+      const record = { ...shared, id: userId, rootDocumentId: documentId }
       db.putUser = jest.fn().mockResolvedValue(undefined)
+      service.sea.signKeyGen = jest.fn().mockResolvedValue({
+        pubKey: documentId,
+        privKey: docSignPrivKey
+      })
 
       const handler = new InitializeUser(userId, deviceId, payload)
 
@@ -899,7 +916,7 @@ describe('Actions', () => {
         encCryptPrivKey: `transformed:${deviceCryptTransformKey}:${groupEncCryptPrivKey}`,
         encSignPrivKey: ``
       })
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
       expect(db.getGroup).toBeCalledWith(groupId)
       expect(primitives.cryptTransform).toBeCalledWith(
         deviceCryptTransformKey,
@@ -949,7 +966,7 @@ describe('Actions', () => {
         encCryptPrivKey: `transformed:${deviceCryptTransformKey}:${memberGroupEncCryptPrivKey}`,
         encSignPrivKey: ``
       })
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
       expect(db.getGroup).toBeCalledWith(groupId)
       expect(db.getMembership).toBeCalledWith(groupId, userId)
       expect(primitives.cryptTransform).toBeCalledWith(
@@ -1010,7 +1027,7 @@ describe('Actions', () => {
       }
 
       expect(success).toEqual(false)
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
     })
 
     it('throws error for unkown user', async () => {
@@ -1038,7 +1055,7 @@ describe('Actions', () => {
       }
 
       expect(success).toEqual(false)
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
       expect(db.getUser).toBeCalledWith(userId)
     })
 

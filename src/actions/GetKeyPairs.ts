@@ -16,7 +16,7 @@ export class GetKeyPairs extends ActionHandler {
   }
 
   async execute(service: LocalService) {
-    const device = await service.db.getDevice(this.userId, this.deviceId)
+    const device = await service.db.getDevice(this.deviceId)
     if (!device) throw new Error('Device does not exist')
 
     if (this.payload.kind === 'user') {

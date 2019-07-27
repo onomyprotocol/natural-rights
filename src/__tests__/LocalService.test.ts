@@ -1,7 +1,11 @@
 import { LocalService } from '../LocalService'
 import { ActionHandler } from '../actions/ActionHandler'
 import { CreateDocument } from '../actions'
-import { SEA } from '../SEA'
+import { initSEA } from '../SEA'
+
+const Gun = require('gun/gun')
+require('gun/sea')
+const SEA = initSEA(Gun)
 
 describe('LocalService', () => {
   let primitives: PrimitivesInterface
@@ -84,9 +88,9 @@ describe('LocalService', () => {
       signature
     }
 
-    it('returns true if valid signed InitializeUser request', async () => {
+    it('returns userId if valid signed InitializeUser request', async () => {
       service.primitives.verify = jest.fn().mockResolvedValue(true)
-      expect(await service.authenticateInitializeUser(request)).toEqual(true)
+      expect(await service.authenticateInitializeUser(request)).toEqual(userId)
       expect(service.primitives.verify).toBeCalledWith(
         deviceSignPubKey,
         request.signature,
@@ -165,7 +169,7 @@ describe('LocalService', () => {
       signature
     }
 
-    it('returns true if the request is signed by valid user', async () => {
+    it('returns userId if the request is signed by valid user', async () => {
       const deviceRecord: DeviceRecord = {
         id: deviceId,
         userId,
@@ -177,7 +181,7 @@ describe('LocalService', () => {
       db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
       primitives.verify = jest.fn().mockResolvedValue(true)
 
-      expect(await service.authenticate(request)).toEqual(true)
+      expect(await service.authenticate(request)).toEqual(userId)
       expect(primitives.verify).toBeCalledWith(
         deviceRecord.signPubKey,
         request.signature,
@@ -590,7 +594,7 @@ describe('LocalService', () => {
       service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue('letspretendthisexists')
 
       expect(await service.getDeviceDocumentDecryptKey(userId, deviceId, documentId)).toEqual('')
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
     })
 
     it("resolves '' if the user has no access to document", async () => {
@@ -605,7 +609,7 @@ describe('LocalService', () => {
       service.getUserDocumentDecryptKey = jest.fn().mockResolvedValue('')
 
       expect(await service.getDeviceDocumentDecryptKey(userId, deviceId, documentId)).toEqual('')
-      expect(db.getDevice).toBeCalledWith(userId, deviceId)
+      expect(db.getDevice).toBeCalledWith(deviceId)
     })
 
     it('resolves a document key transformed to device if user has access', async () => {

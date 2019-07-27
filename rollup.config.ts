@@ -21,17 +21,7 @@ export default {
     { file: pkg.module, format: 'es', sourcemap: true }
   ],
   // Indicate here external modules you don't wanna include in your bundle (i.e.: 'lodash')
-  external: [
-    'node-lmdb',
-    'express',
-    'body-parser',
-    `gun`,
-    `gun/gun`,
-    `gun/sea`,
-    'gun/sea/shim',
-    'gun/sea/sha256',
-    'gun/sea/settings'
-  ],
+  external: ['node-lmdb', 'express', 'body-parser'],
   watch: {
     include: 'es/**'
   },
