@@ -1,13 +1,14 @@
 {
   "name": "natural-rights",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "keywords": [],
   "main": "dist/natural-rights.umd.js",
   "module": "dist/natural-rights.es5.js",
   "typings": "dist/types/natural-rights.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "es"
   ],
   "engines": {
     "node": ">=6.0.0"
