@@ -100,12 +100,20 @@ export class LocalService implements ServiceInterface {
         error: 'Unauthorized'
       } as Result
     }
-    return {
-      ...action,
-      payload: await handler.execute(this),
-      success: true,
-      error: ''
-    } as Result
+    try {
+      return {
+        ...action,
+        payload: await handler.execute(this),
+        success: true,
+        error: ''
+      } as Result
+    } catch (error) {
+      return {
+        ...action,
+        success: false,
+        error
+      } as Result
+    }
   }
 
   async getIsGroupAdmin(groupId: string, userId: string) {
