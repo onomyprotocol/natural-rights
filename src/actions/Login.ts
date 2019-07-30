@@ -10,16 +10,25 @@ export class Login extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return !!this.userId
+    return true
   }
 
   async execute(service: LocalService) {
-    const user = await service.db.getUser(this.userId)
-    if (!user) throw new Error('User does not exist')
+    if (!this.payload.cryptPubKey) throw new Error('No device cryptPubKey')
+    const device = {
+      id: this.deviceId,
+      userId: '',
+      cryptTransformKey: '',
+      ...(await service.db.getDevice(this.deviceId)),
+      signPubKey: this.deviceId,
+      cryptPubKey: this.payload.cryptPubKey
+    }
+    const { userId } = device
+    const [user] = await Promise.all([service.db.getUser(userId), service.db.putDevice(device)])
 
     return {
-      userId: this.userId,
-      rootDocumentId: user.rootDocumentId
+      userId,
+      rootDocumentId: user ? user.rootDocumentId : ''
     } as LoginResult
   }
 }

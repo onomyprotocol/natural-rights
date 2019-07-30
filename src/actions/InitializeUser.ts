@@ -11,7 +11,9 @@ export class InitializeUser extends ActionHandler {
 
   async checkIsAuthorized(service: LocalService) {
     if (this.userId !== this.payload.userId) return false
-    const existing = await service.db.getUser(this.userId)
+    const device = await service.db.getDevice(this.deviceId)
+    if (!device || device.userId) return false
+    const existing = await service.db.getUser(this.payload.userId)
     return !existing
   }
 

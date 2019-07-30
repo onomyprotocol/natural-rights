@@ -59,7 +59,7 @@ export function initGUN(Gun: any) {
       if (k === '_') return false
       const val = Gun.SEA.opt.parse(unsigned[k])
       // Don't resign/encrypt things that are already signed
-      return !val['~']
+      return !(val && val['~'])
     })
     if (!keys.length) return unsigned
     const plaintexts = keys.map(key => data[key])

@@ -10,6 +10,7 @@ export class SignDocument extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return false
     const canSign = await service.getHasSignAccess(this.userId, this.payload.documentId)
     if (canSign) return true
     return false

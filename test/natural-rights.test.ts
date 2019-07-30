@@ -59,16 +59,20 @@ describe('Natural rights integration tests', () => {
     beforeEach(async () => {
       try {
         alice = await connect()
-        await alice.initializeUser()
+        await alice.login()
+        await alice.registerUser()
 
         bob = await connect()
-        await bob.initializeUser()
+        await bob.login()
+        await bob.registerUser()
 
         carol = await connect()
-        await carol.initializeUser()
+        await carol.login()
+        await carol.registerUser()
 
         eve = await connect()
-        await eve.initializeUser()
+        await eve.login()
+        await eve.registerUser()
       } catch (e) {
         console.error(e.stack || e)
         throw e

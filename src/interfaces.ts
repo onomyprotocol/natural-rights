@@ -3,14 +3,9 @@ interface ClientInterface {
   deviceId: string
   service: ServiceInterface
 
-  initializeUser: () => Promise<void>
-  addDevice: (
-    deviceId: string
-  ) => Promise<{
-    deviceSignKeyPair: KeyPair
-    deviceCryptKeyPair: KeyPair
-  }>
-  removeDevice: (deviceId: string) => Promise<void>
+  registerUser: () => Promise<void>
+  authorizeDevice: (deviceId: string) => Promise<void>
+  deauthorizeDevice: (deviceId: string) => Promise<void>
 
   createGroup: () => Promise<string>
   addAdminToGroup: (groupId: string, userId: string) => Promise<void>
@@ -88,8 +83,10 @@ interface ServiceInterface {
 type ActionType =
   | 'InitializeUser'
   | 'Login'
+  | `RegisterDevice`
   | 'AddDevice'
   | 'RemoveDevice'
+  | 'AuthorizeDevice'
   | 'CreateGroup'
   | 'AddMemberToGroup'
   | 'RemoveMemberFromGroup'
@@ -113,8 +110,10 @@ type ResultType =
   | null
   | InitializeUserResult
   | LoginResult
+  | RegisterDeviceResult
   | AddDeviceResult
   | RemoveDeviceResult
+  | AuthorizeDeviceResult
   | CreateGroupResult
   | AddMemberToGroupResult
   | RemoveMemberFromGroupResult
@@ -148,7 +147,7 @@ interface DatabaseAdapterInterface {
 }
 
 type GrantKind = 'user' | 'group'
-type SignatureKind = 'user' | 'group' | 'document'
+type SignatureKind = 'user' | 'device' | 'group' | 'document'
 
 interface DatabaseInterface {
   getUser: (id: string) => Promise<UserRecord | null>
@@ -253,6 +252,7 @@ type NaturalRightsAction = Action<
   | LoginAction
   | AddDeviceAction
   | RemoveDeviceAction
+  | AuthorizeDeviceAction
   | CreateGroupAction
   | AddMemberToGroupAction
   | RemoveMemberFromGroupAction
@@ -291,10 +291,22 @@ interface InitializeUserAction {
 
 interface InitializeUserResult extends InitializeUserAction {}
 
-interface LoginAction {}
+interface LoginAction {
+  cryptPubKey: string
+}
+
 interface LoginResult extends LoginAction {
   rootDocumentId: string
   userId: string
+}
+
+interface RegisterDeviceAction {
+  cryptPubKey: string
+  signPubKey: string
+}
+
+interface RegisterDeviceResult {
+  deviceId: string
 }
 
 interface AddDeviceAction {
@@ -310,6 +322,17 @@ interface AddDeviceResult {
   userId: string
   cryptPubKey: string
   signPubKey: string
+}
+
+interface AuthorizeDeviceAction {
+  deviceId: string
+  userId: string
+  cryptTransformKey: string
+}
+
+interface AuthorizeDeviceResult {
+  deviceId: string
+  userId: string
 }
 
 interface RemoveDeviceAction {

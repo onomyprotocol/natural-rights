@@ -10,6 +10,7 @@ export class GetKeyPairs extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return false
     if (this.payload.kind === 'group') return service.getIsGroupAdmin(this.payload.id, this.userId)
     if (this.payload.kind === 'user') return this.payload.id === this.userId
     return false

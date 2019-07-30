@@ -22,9 +22,7 @@ export class GunRightsChain {
 
   userId() {
     const rights = this._root.rights()
-    if (rights !== this) {
-      return rights.userId()
-    }
+    if (rights !== this) return rights.userId()
     return this.client ? this.client.userId : ''
   }
 
@@ -51,15 +49,9 @@ export class GunRightsChain {
       return this
     }
 
-    if (this.client) throw new Error('Already logged in')
+    if (!this.client) throw new Error('Must login first')
 
-    const deviceCryptKeyPair = await this.service.primitives.cryptKeyGen()
-    const deviceSignKeyPair = await this.service.primitives.signKeyGen()
-
-    const newClient = new Client(this.service, deviceCryptKeyPair, deviceSignKeyPair)
-
-    await newClient.initializeUser()
-    this.client = newClient
+    await this.client.registerUser()
     return this
   }
 
@@ -82,7 +74,21 @@ export class GunRightsChain {
       await rights.logout()
       return this
     }
-    this.client = undefined
+    if (!this.client) return
+    await this.client.deauthorizeDevice()
+    await this.client.login()
+    return this
+  }
+
+  async authorizeDevice(deviceId: string) {
+    await this.getClient().authorizeDevice(deviceId)
+    return this
+  }
+
+  async deauthorizeDevice(deviceId: string) {
+    const client = this.getClient()
+    if (client && client.deviceId === deviceId) return this.logout()
+    await client.deauthorizeDevice(deviceId)
     return this
   }
 
@@ -97,7 +103,7 @@ export class GunRightsChain {
     { read, sign, admin } = { read: true, sign: true, admin: false }
   ) {
     if (admin) {
-      await this.client!.addAdminToGroup(groupId, userId)
+      await this.getClient().addAdminToGroup(groupId, userId)
       return this
     }
 
@@ -165,15 +171,12 @@ export function attachToGun(Gun: any, Primitives: PrimitivesInterface, url: stri
 
   const GUN = initGUN(Gun)
   const SEA = GUN.SEA
-
   const service = new RemoteHttpService(Primitives, SEA, url)
 
   Gun.on(`opt`, function(this: any, at: any) {
     if (!at.naturalRights) {
       GUN.afore(at.on('out'), GUN.gunWireOutput)
-      // at.on('out', GUN.gunWireOutput, at)
       at.on('node', GUN.gunApiOutput, at)
-      // GUN.afore(at.on('node'), GUN.gunApiOutput)
     }
 
     this.to.next(at)
@@ -183,16 +186,9 @@ export function attachToGun(Gun: any, Primitives: PrimitivesInterface, url: stri
     let root = this.back(-1)
     let nr: GunRightsChain = root._.naturalRights
 
-    if (nr && root === this) {
-      return nr
-    }
-
+    if (nr && root === this) return nr
     nr = new GunRightsChain(GUN, service, root, this)
-
-    if (this === root) {
-      root._.naturalRights = nr
-    }
-
+    if (this === root) root._.naturalRights = nr
     return nr
   }
 }

@@ -36,6 +36,7 @@ export class LocalService implements ServiceInterface {
     const actions = this.parseRequestBody(req)
     const initializeUserActions = actions.filter(action => action.type === 'InitializeUser')
     const addDeviceActions = actions.filter(({ type }) => type === 'AddDevice')
+
     if (initializeUserActions.length !== 1 || addDeviceActions.length !== 1) return false
     const initializeUser = initializeUserActions[0].payload as InitializeUserAction
     const addDevice = addDeviceActions[0].payload as AddDeviceAction
@@ -49,11 +50,37 @@ export class LocalService implements ServiceInterface {
     return false
   }
 
+  async authenticateLogin(req: NaturalRightsRequest) {
+    const actions = this.parseRequestBody(req)
+    const loginActions = actions.filter(action => action.type === 'Login')
+    if (actions.length !== loginActions.length || loginActions.length !== 1) return false
+    if (await this.primitives.verify(req.deviceId, req.signature, req.body)) {
+      return ''
+    }
+    return false
+  }
+
   async authenticate(req: NaturalRightsRequest) {
     const device = await this.db.getDevice(req.deviceId)
-    if (!device || !device.signPubKey) return this.authenticateInitializeUser(req)
+    if (!device || !device.signPubKey) return this.authenticateLogin(req)
+    const actions = this.parseRequestBody(req)
+    const initializeUserActions = actions.filter(action => action.type === 'InitializeUser')
+    if (initializeUserActions.length > 1) return false
+
     if (await this.primitives.verify(device.signPubKey, req.signature, req.body)) {
-      return device.userId
+      if (device.userId) {
+        return device.userId
+      }
+
+      if (initializeUserActions.length === 1) {
+        const initUserAction = initializeUserActions[0]
+        if (initUserAction !== actions[0]) return false
+        const initUser = initializeUserActions[0].payload as InitializeUserAction
+        const existing = await this.db.getUser(initUser.userId)
+        if (!existing) return initUser.userId
+      }
+
+      return ''
     }
     return false
   }
@@ -63,7 +90,8 @@ export class LocalService implements ServiceInterface {
     const actions = this.parseRequestBody(req)
     const userId = await this.authenticate(req)
 
-    if (!userId) {
+    if (userId === false) {
+      // signature failed validation
       return {
         results: actions.map(result => ({
           ...result,

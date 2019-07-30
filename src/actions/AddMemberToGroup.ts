@@ -10,6 +10,7 @@ export class AddMemberToGroup extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return false
     return service.getIsGroupAdmin(this.payload.groupId, this.userId)
   }
 

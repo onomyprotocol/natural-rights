@@ -10,6 +10,7 @@ export class DecryptDocument extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return false
     return service.getHasReadAccess(this.userId, this.payload.documentId)
   }
 

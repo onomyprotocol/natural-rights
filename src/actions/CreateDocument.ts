@@ -10,7 +10,11 @@ export class CreateDocument extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return this.payload.cryptUserId === this.userId && this.userId === this.payload.creatorId
+    return (
+      !!this.userId &&
+      this.payload.cryptUserId === this.userId &&
+      this.userId === this.payload.creatorId
+    )
   }
 
   async execute(service: LocalService) {

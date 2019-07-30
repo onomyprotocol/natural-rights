@@ -10,7 +10,7 @@ export class CreateGroup extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
-    return this.payload.userId === this.userId
+    return !!this.userId && this.payload.userId === this.userId
   }
 
   async execute(service: LocalService) {

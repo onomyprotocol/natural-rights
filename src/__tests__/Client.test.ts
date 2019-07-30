@@ -158,17 +158,17 @@ describe('Client', () => {
     })
 
     it('uses cryptKeyGen to generate encryption key pair', async () => {
-      await client.initializeUser()
+      await client.registerUser()
       expect(service.primitives.cryptKeyGen).toHaveBeenCalled()
     })
 
     it('uses signKeyGen to generate signing key pair', async () => {
-      await client.initializeUser()
+      await client.registerUser()
       expect(service.primitives.cryptKeyGen).toHaveBeenCalled()
     })
 
     it('uses Encrypt to encrypt private keys', async () => {
-      await client.initializeUser()
+      await client.registerUser()
       expect(service.primitives.encrypt).toHaveBeenCalledWith(
         'cryptPubKey',
         'signPrivKey',
@@ -191,7 +191,7 @@ describe('Client', () => {
       }
       service.primitives.signKeyGen = jest.fn().mockResolvedValue(userSignKeyPair)
 
-      await client.initializeUser()
+      await client.registerUser()
 
       expect(client.request).toHaveBeenCalledWith([
         {
@@ -219,6 +219,7 @@ describe('Client', () => {
     })
   })
 
+  /*
   describe('addDevice', () => {
     it('makes a request including userId, deviceId, public and transform keys', async () => {
       const client = new Client(service, deviceCryptKeyPair, deviceSignKeyPair)
@@ -246,8 +247,9 @@ describe('Client', () => {
       ])
     })
   })
+  */
 
-  describe('removeDevice', () => {
+  describe('deauthorizeDevice', () => {
     it('makes a request including userId and deviceId', async () => {
       const client = new Client(service, deviceCryptKeyPair, deviceSignKeyPair)
       client.userId = userId
@@ -256,7 +258,7 @@ describe('Client', () => {
         results: []
       })
 
-      await client.removeDevice(toRemoveId)
+      await client.deauthorizeDevice(toRemoveId)
       expect(client.request).toHaveBeenCalledWith([
         {
           type: 'RemoveDevice',

@@ -33,25 +33,33 @@ export class Client implements ClientInterface {
     return response
   }
 
-  async login() {
+  async login(register = false) {
     const response = await this.request([
       {
         type: 'Login',
-        payload: {}
+        payload: {
+          cryptPubKey: this.deviceCryptKeyPair.pubKey
+        }
       }
     ])
     const result = response.results.find(({ type }) => type === 'Login')
     if (!result) throw new Error('No Login result')
     const { rootDocumentId, userId } = result.payload as LoginResult
-    this.userId = userId
-    this.rootDocumentId = rootDocumentId
+    if (userId) {
+      this.userId = userId
+      this.rootDocumentId = rootDocumentId
+    } else if (register) {
+      await this.registerUser()
+      return { rootDocumentId: this.rootDocumentId, userId: this.userId }
+    }
     return { rootDocumentId, userId }
   }
 
-  async initializeUser() {
+  async registerUser() {
+    if (this.userId) return
     const userSignKeyPair = await this.service.primitives.signKeyGen()
     const userCryptKeyPair = await this.service.primitives.cryptKeyGen()
-    const deviceCryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
+    const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       userCryptKeyPair,
       this.deviceCryptKeyPair.pubKey,
       this.deviceSignKeyPair
@@ -76,74 +84,70 @@ export class Client implements ClientInterface {
       this.deviceSignKeyPair
     )
 
-    this.userId = userSignKeyPair.pubKey
+    try {
+      await this.request([
+        {
+          type: `InitializeUser`,
+          payload: {
+            userId: userSignKeyPair.pubKey,
+            cryptPubKey: userCryptKeyPair.pubKey,
+            encCryptPrivKey: userEncCryptPrivKey,
+            encSignPrivKey: userEncSignPrivKey,
 
-    await this.request([
-      {
-        type: 'InitializeUser',
-        payload: {
-          userId: this.userId,
-          cryptPubKey: userCryptKeyPair.pubKey,
-          encCryptPrivKey: userEncCryptPrivKey,
-          encSignPrivKey: userEncSignPrivKey,
-
-          rootDocCryptPubKey: rootDocCryptKeyPair.pubKey,
-          rootDocEncCryptPrivKey
+            rootDocCryptPubKey: rootDocCryptKeyPair.pubKey,
+            rootDocEncCryptPrivKey
+          }
+        },
+        {
+          type: `AuthorizeDevice`,
+          payload: {
+            userId: userSignKeyPair.pubKey,
+            deviceId: this.deviceId,
+            cryptTransformKey
+          }
         }
-      },
-      {
-        type: 'AddDevice',
-        payload: {
-          deviceId: this.deviceId,
-          userId: this.userId,
-          cryptPubKey: this.deviceCryptKeyPair.pubKey,
-          signPubKey: this.deviceSignKeyPair.pubKey,
-          cryptTransformKey: deviceCryptTransformKey
-        }
-      }
-    ] as [Action<InitializeUserAction>, Action<AddDeviceAction>])
-    await this.login()
+      ])
+    } catch (e) {
+      throw e
+    } finally {
+      await this.login()
+    }
   }
 
-  async addDevice(deviceId: string) {
+  async authorizeDevice(deviceId: string) {
     const userCryptKeyPair = await this.getEncryptionKeyPair('user', this.userId)
-    const deviceCryptKeyPair = await this.service.primitives.cryptKeyGen()
-    const deviceSignKeyPair = await this.service.primitives.signKeyGen()
+    const { cryptPubKey: deviceCryptPubKey } = await this.getPublicKeys('device', deviceId)
     const cryptTransformKey = await this.service.primitives.cryptTransformKeyGen(
       userCryptKeyPair,
-      deviceCryptKeyPair.pubKey,
-      deviceSignKeyPair
+      deviceCryptPubKey,
+      this.deviceSignKeyPair
     )
 
     await this.request([
       {
-        type: 'AddDevice',
+        type: 'AuthorizeDevice',
         payload: {
           deviceId,
           userId: this.userId,
-          cryptPubKey: deviceCryptKeyPair.pubKey,
-          signPubKey: deviceSignKeyPair.pubKey,
           cryptTransformKey
         }
       }
-    ] as [Action<AddDeviceAction>])
-
-    return {
-      deviceSignKeyPair,
-      deviceCryptKeyPair
-    }
+    ] as [Action<AuthorizeDeviceAction>])
   }
 
-  async removeDevice(deviceId: string) {
+  async deauthorizeDevice(deviceId = '') {
     await this.request([
       {
         type: 'RemoveDevice',
         payload: {
           userId: this.userId,
-          deviceId
+          deviceId: deviceId || this.deviceId
         }
       }
     ] as [Action<RemoveDeviceAction>])
+    if (deviceId === this.deviceId || !deviceId) {
+      this.userId = this.rootDocumentId = ''
+    }
   }
 
   async createGroup() {

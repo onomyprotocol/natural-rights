@@ -10,6 +10,7 @@ export class RemoveMemberFromGroup extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return false
     if (this.payload.userId === this.userId) return true
     return service.getIsGroupAdmin(this.payload.groupId, this.userId)
   }

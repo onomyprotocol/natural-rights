@@ -10,6 +10,7 @@ export class RemoveDevice extends ActionHandler {
   }
 
   async checkIsAuthorized(service: LocalService) {
+    if (!this.userId) return this.deviceId === this.payload.deviceId
     return this.payload.userId === this.userId
   }
 
