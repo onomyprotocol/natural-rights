@@ -140,13 +140,11 @@ export class GunRightsChain {
   get(documentId: string) {
     const soul = this.GUN.documentIdToSoul(documentId)
     const chain = this._root.get(soul)
+    chain._.opt = { uuid: this.uuid.bind(this) }
     return chain
   }
 
-  // Could be useful for tighter gun integration
-  // If async uuids work in gun
   uuid(cb?: (err: any, soul: string) => void) {
-    console.log('called uuid', cb)
     if (!cb) return
     return (async () => {
       try {
