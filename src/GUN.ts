@@ -98,6 +98,7 @@ export function initGUN(Gun: any) {
       )
       return { ...decrypted, decryptError: null }
     } catch (e) {
+      console.error('Error decrypting', documentId, data, e)
       const result = {
         ...data,
         decryptError: e
@@ -119,7 +120,12 @@ export function initGUN(Gun: any) {
       const soul = souls[i]
       const docId = getDocumentId(soul)
       if (!docId) continue
-      msg.put[soul] = await toSignedNode(client, docId, msg.put[soul])
+      try {
+        msg.put[soul] = await toSignedNode(client, docId, msg.put[soul])
+      } catch (e) {
+        console.error('error signing', soul, msg.put, e)
+        throw e
+      }
     }
 
     this && this.to && this.to.next && this.to.next(msg)

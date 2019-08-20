@@ -169,6 +169,7 @@ export class LocalService implements ServiceInterface {
       }
 
       const membership = await this.db.getMembership(grant.id, userId)
+
       if (membership) return { document, grant, membership }
     }
   }

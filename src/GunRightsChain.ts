@@ -3,6 +3,7 @@ import { initGUN } from './GUN'
 import { RemoteHttpService } from './RemoteHttpService'
 
 type GunChain = any
+type GunRightsOptions = any
 
 export class GunRightsChain {
   GUN: any
@@ -11,13 +12,21 @@ export class GunRightsChain {
   documentId: string
   _root: GunChain
   parent: GunChain
+  opts: GunRightsOptions
 
-  constructor(GUN: any, service: ServiceInterface, root: GunChain, parent: GunChain) {
+  constructor(
+    GUN: any,
+    service: ServiceInterface,
+    root: GunChain,
+    parent: GunChain,
+    opts: GunRightsOptions
+  ) {
     this.GUN = GUN
     this.service = service
     this._root = root
     this.parent = parent
-    this.documentId = GUN.getDocumentId(parent._.soul || '')
+    this.opts = opts
+    this.documentId = GUN.getDocumentId(parent._.soul || parent._.link || '')
   }
 
   userId() {
@@ -156,6 +165,9 @@ export class GunRightsChain {
       try {
         const { id } = await this.getClient().createDocument()
         const soul = this.GUN.documentIdToSoul(id)
+        if (this.opts && this.opts.afterNewUuid) {
+          await this.opts.afterNewUuid(id)
+        }
         cb(null, soul)
         return soul
       } catch (err) {
@@ -182,13 +194,13 @@ export function attachToGun(Gun: any, Primitives: PrimitivesInterface, url: stri
     this.to.next(at)
   })
 
-  Gun.chain.rights = function(this: any) {
+  Gun.chain.rights = function(this: any, opts: GunRightsOptions) {
     let root = this.back(-1)
     let nr: GunRightsChain = root._.naturalRights
 
-    if (nr && root === this) return nr
-    nr = new GunRightsChain(GUN, service, root, this)
-    if (this === root) root._.naturalRights = nr
+    if (nr && root === this && !opts) return nr
+    nr = new GunRightsChain(GUN, service, root, this, opts)
+    if (this === root && !opts) root._.naturalRights = nr
     return nr
   }
 }

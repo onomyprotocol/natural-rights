@@ -187,7 +187,8 @@ export class Client implements ClientInterface {
         payload: {
           groupId,
           userId: this.userId,
-          cryptTransformKey
+          cryptTransformKey,
+          canSign: true
         }
       },
       {
