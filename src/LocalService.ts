@@ -32,24 +32,6 @@ export class LocalService implements ServiceInterface {
     return JSON.parse(req.body) as NaturalRightsAction[]
   }
 
-  async authenticateInitializeUser(req: NaturalRightsRequest) {
-    const actions = this.parseRequestBody(req)
-    const initializeUserActions = actions.filter(action => action.type === 'InitializeUser')
-    const addDeviceActions = actions.filter(({ type }) => type === 'AddDevice')
-
-    if (initializeUserActions.length !== 1 || addDeviceActions.length !== 1) return false
-    const initializeUser = initializeUserActions[0].payload as InitializeUserAction
-    const addDevice = addDeviceActions[0].payload as AddDeviceAction
-
-    const user = await this.db.getUser(initializeUser.userId)
-    if (user) return false
-
-    if (await this.primitives.verify(addDevice.signPubKey, req.signature, req.body)) {
-      return initializeUser.userId
-    }
-    return false
-  }
-
   async authenticateLogin(req: NaturalRightsRequest) {
     const actions = this.parseRequestBody(req)
     const loginActions = actions.filter(action => action.type === 'Login')

@@ -8,10 +8,6 @@ const SEA = initSEA(Gun)
 describe('Client', () => {
   let service: ServiceInterface
   const userId = 'testuserid'
-  const userCryptKeyPair = {
-    privKey: 'userCryptPrivKey',
-    pubKey: 'userCryptPubKey'
-  }
   const deviceCryptKeyPair = {
     privKey: 'deviceCryptPrivKey',
     pubKey: 'deviceCryptPubKey'
@@ -206,10 +202,8 @@ describe('Client', () => {
           }
         },
         {
-          type: 'AddDevice',
+          type: 'AuthorizeDevice',
           payload: {
-            cryptPubKey: 'deviceCryptPubKey',
-            signPubKey: 'deviceSignPubKey',
             cryptTransformKey: 'transform:cryptPrivKey:deviceCryptPubKey',
             deviceId,
             userId: userSignKeyPair.pubKey
@@ -218,36 +212,6 @@ describe('Client', () => {
       ])
     })
   })
-
-  /*
-  describe('addDevice', () => {
-    it('makes a request including userId, deviceId, public and transform keys', async () => {
-      const client = new Client(service, deviceCryptKeyPair, deviceSignKeyPair)
-      client.userId = userId
-      client.request = jest.fn().mockResolvedValue({
-        results: []
-      })
-      client.getEncryptionKeyPair = jest.fn().mockResolvedValue(userCryptKeyPair)
-
-      const newDeviceId = 'newDeviceId'
-
-      await client.addDevice(newDeviceId)
-
-      expect(client.request).toHaveBeenCalledWith([
-        {
-          type: 'AddDevice',
-          payload: {
-            cryptPubKey: 'cryptPubKey',
-            signPubKey: 'signPubKey',
-            cryptTransformKey: 'transform:userCryptPrivKey:cryptPubKey',
-            deviceId: newDeviceId,
-            userId
-          }
-        }
-      ])
-    })
-  })
-  */
 
   describe('deauthorizeDevice', () => {
     it('makes a request including userId and deviceId', async () => {
@@ -326,6 +290,7 @@ describe('Client', () => {
         {
           type: 'AddMemberToGroup',
           payload: {
+            canSign: true,
             cryptTransformKey: 'transform:cryptPrivKey:userCryptPubKey',
             groupId,
             userId

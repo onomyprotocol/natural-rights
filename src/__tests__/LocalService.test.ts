@@ -47,84 +47,49 @@ describe('LocalService', () => {
     db = service.db
   })
 
-  describe('authenticateInitializeUser', () => {
-    const userId = 'testUserId'
-    const userCryptPubKey = 'userCryptPubKey'
-    const userSignPubKey = 'userSignPubKey'
-    const userEncCryptPrivKey = 'userEncCryptPrivKey'
-    const userEncSignPrivKey = 'userEncSignPrivKey'
-    const deviceId = 'testDeviceId'
-    const deviceCryptPubKey = 'deviceCryptPubKey'
-    const deviceSignPubKey = 'deviceSignPubKey'
-    const deviceCryptTransformKey = 'deviceCryptTransformKey'
-
-    const actions = [
-      {
-        type: 'InitializeUser',
-        payload: {
-          userId,
-          cryptPubKey: userCryptPubKey,
-          signPubKey: userSignPubKey,
-          encCryptPrivKey: userEncCryptPrivKey,
-          encSignPrivKey: userEncSignPrivKey
-        } as InitializeUserAction
-      },
-      {
-        type: 'AddDevice',
-        payload: {
-          deviceId,
-          userId,
-          cryptPubKey: deviceCryptPubKey,
-          signPubKey: deviceSignPubKey,
-          cryptTransformKey: deviceCryptTransformKey
-        } as AddDeviceAction
+  describe('authenticateLogin', () => {
+    it('returns empty string if request is Login request and only login request with valid device signature', async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+      const actions = [
+        {
+          type: 'Login',
+          payload: {}
+        }
+      ]
+      const signature = 'expectedSignature'
+      const request = {
+        userId,
+        deviceId,
+        body: JSON.stringify(actions),
+        signature
       }
-    ]
-    const signature = 'expectedSignature'
-    const request = {
-      userId,
-      deviceId,
-      body: JSON.stringify(actions),
-      signature
-    }
 
-    it('returns userId if valid signed InitializeUser request', async () => {
       service.primitives.verify = jest.fn().mockResolvedValue(true)
-      expect(await service.authenticateInitializeUser(request)).toEqual(userId)
-      expect(service.primitives.verify).toBeCalledWith(
-        deviceSignPubKey,
-        request.signature,
-        request.body
-      )
+
+      expect(await service.authenticate(request)).toEqual('')
     })
 
-    it("returns false if actions don't include a single InitializeUser and AddDevice", async () => {
-      service.primitives.verify = jest.fn().mockResolvedValue(true)
-      const badRequest = {
-        ...request,
-        body: JSON.stringify([actions[0]])
+    it('returns false if request is not login request', async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+      const actions = [
+        {
+          type: 'AnythingElse',
+          payload: {}
+        }
+      ]
+      const signature = 'expectedSignature'
+      const request = {
+        userId,
+        deviceId,
+        body: JSON.stringify(actions),
+        signature
       }
-      expect(await service.authenticateInitializeUser(badRequest)).toEqual(false)
-      expect(service.primitives.verify).not.toBeCalled()
-    })
 
-    it('returns false if signature cannot be verified', async () => {
-      service.primitives.verify = jest.fn().mockResolvedValue(false)
-      expect(await service.authenticateInitializeUser(request)).toEqual(false)
-      expect(service.primitives.verify).toBeCalledWith(
-        deviceSignPubKey,
-        request.signature,
-        request.body
-      )
-    })
+      service.primitives.verify = jest.fn().mockResolvedValue(true)
 
-    it('returns false if user already exists', async () => {
-      db.getUser = jest.fn().mockResolvedValue({
-        userId
-      })
-
-      expect(await service.authenticateInitializeUser(request)).toEqual(false)
-      expect(db.getUser).toBeCalledWith(userId)
+      expect(await service.authenticate(request)).toEqual(false)
     })
   })
 
@@ -177,7 +142,7 @@ describe('LocalService', () => {
         cryptPubKey: 'deviceCryptPubKey',
         cryptTransformKey: 'deviceCryptTransformKey'
       }
-      service.authenticateInitializeUser = jest.fn().mockResolvedValue(false)
+      service.authenticateLogin = jest.fn().mockResolvedValue(false)
       db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
       primitives.verify = jest.fn().mockResolvedValue(true)
 
@@ -187,7 +152,7 @@ describe('LocalService', () => {
         request.signature,
         request.body
       )
-      expect(service.authenticateInitializeUser).not.toBeCalled()
+      expect(service.authenticateLogin).not.toBeCalled()
     })
 
     it('returns false if the request is not signed by valid user', async () => {
@@ -198,7 +163,7 @@ describe('LocalService', () => {
         cryptPubKey: 'deviceCryptPubKey',
         cryptTransformKey: 'deviceCryptTransformKey'
       }
-      service.authenticateInitializeUser = jest.fn().mockResolvedValue(false)
+      service.authenticateLogin = jest.fn().mockResolvedValue(false)
       db.getDevice = jest.fn().mockResolvedValue(deviceRecord)
       primitives.verify = jest.fn().mockResolvedValue(false)
 
@@ -208,14 +173,14 @@ describe('LocalService', () => {
         request.signature,
         request.body
       )
-      expect(service.authenticateInitializeUser).not.toBeCalled()
+      expect(service.authenticateLogin).not.toBeCalled()
     })
 
     it('defers to authenticateInitialUser if device cannot be found', async () => {
-      service.authenticateInitializeUser = jest.fn().mockResolvedValue(true)
+      service.authenticateLogin = jest.fn().mockResolvedValue(true)
 
       expect(await service.authenticate(request)).toEqual(true)
-      expect(service.authenticateInitializeUser).toBeCalledWith(request)
+      expect(service.authenticateLogin).toBeCalledWith(request)
     })
   })
 

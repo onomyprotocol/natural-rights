@@ -84,6 +84,9 @@ describe('Actions', () => {
 
   describe('InitializeUser', () => {
     it('requires that the requesting user match the userId of the request and that the user not exist', async () => {
+      const userId = 'testUserId'
+      const deviceId = 'testDeviceId'
+
       const actionBase = {
         cryptPubKey: 'cryptPubKey',
         signPubKey: 'signPubKey',
@@ -93,27 +96,41 @@ describe('Actions', () => {
         rootDocEncCryptPrivKey: `rootDocEncCryptPrivKey`
       }
 
-      const withMatch = new InitializeUser('userId', 'deviceId', {
+      const withMatch = new InitializeUser(userId, deviceId, {
         ...actionBase,
-        userId: 'userId'
+        userId
       })
 
-      const withoutMatch = new InitializeUser('userId', 'deviceId', {
+      const withoutMatch = new InitializeUser(userId, deviceId, {
         ...actionBase,
         userId: 'otherUserId'
       })
 
       db.getUser = jest.fn().mockResolvedValue(null)
+      db.getDevice = jest.fn().mockResolvedValue({
+        userId: ''
+      })
 
       expect(await withoutMatch.checkIsAuthorized(service)).toEqual(false)
       expect(db.getUser).not.toBeCalled()
+
+      await withMatch.checkIsAuthorized(service)
+      expect(db.getDevice).toBeCalledWith(deviceId)
+      expect(db.getUser).toBeCalledWith(userId)
+
       expect(await withMatch.checkIsAuthorized(service)).toEqual(true)
-      expect(db.getUser).toBeCalledWith('userId')
       db.getUser = jest.fn().mockResolvedValue({
-        userId: 'userId'
+        userId
       })
       expect(await withMatch.checkIsAuthorized(service)).toEqual(false)
-      expect(db.getUser).toBeCalledWith('userId')
+      expect(db.getUser).toBeCalledWith(userId)
+
+      db.getUser = jest.fn().mockResolvedValue(null)
+      db.getDevice = jest.fn().mockResolvedValue({
+        userId
+      })
+
+      expect(await withMatch.checkIsAuthorized(service)).toEqual(false)
     })
 
     it('persists UserRecord', async () => {
