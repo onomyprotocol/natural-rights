@@ -17,11 +17,7 @@ import {
 } from '../actions'
 import { ActionHandler } from '../actions/ActionHandler'
 import { LocalService } from '../LocalService'
-import { initSEA } from '../SEA'
-
-const Gun = require('gun/gun')
-require('gun/sea')
-const SEA = initSEA(Gun)
+import { SEA } from '../SEA'
 
 describe('Actions', () => {
   let primitives: PrimitivesInterface
@@ -718,7 +714,10 @@ describe('Actions', () => {
 
   describe('GetPubKeys', () => {
     it('allows anyone', async () => {
-      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', { kind: 'user', id: 'whatever' })
+      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', {
+        kind: 'user',
+        id: 'whatever'
+      })
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
     })
 
@@ -732,7 +731,10 @@ describe('Actions', () => {
         encCryptPrivKey: 'shouldntmatter',
         encSignPrivKey: 'shouldntmatter'
       } as UserRecord)
-      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', { kind: 'user', id: userId })
+      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', {
+        kind: 'user',
+        id: userId
+      })
 
       expect(await handler.execute(service)).toEqual({
         kind: 'user',
@@ -751,7 +753,10 @@ describe('Actions', () => {
         cryptPubKey,
         encCryptPrivKey: 'shouldntmatter'
       } as GroupRecord)
-      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', { kind: 'group', id: groupId })
+      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', {
+        kind: 'group',
+        id: groupId
+      })
 
       expect(await handler.execute(service)).toEqual({
         kind: 'group',
@@ -784,7 +789,10 @@ describe('Actions', () => {
     it('throws error if user does not exist', async () => {
       const userId = 'testUserId'
       db.getUser = jest.fn().mockResolvedValue(null)
-      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', { kind: 'user', id: userId })
+      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', {
+        kind: 'user',
+        id: userId
+      })
 
       let success = false
       try {
@@ -801,7 +809,10 @@ describe('Actions', () => {
     it('throws error if group does not exist', async () => {
       const groupId = 'testGroupId'
       db.getGroup = jest.fn().mockResolvedValue(null)
-      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', { kind: 'group', id: groupId })
+      const handler = new GetPubKeys('anyUserId', 'anyDeviceId', {
+        kind: 'group',
+        id: groupId
+      })
 
       let success = false
       try {
@@ -819,7 +830,10 @@ describe('Actions', () => {
   describe('GetKeyPairs', () => {
     it('allows user if requesting user pairs', async () => {
       const userId = 'testUserId'
-      const handler = new GetKeyPairs(userId, 'anyDeviceId', { kind: 'user', id: userId })
+      const handler = new GetKeyPairs(userId, 'anyDeviceId', {
+        kind: 'user',
+        id: userId
+      })
       const notMyHandler = new GetKeyPairs('otherUserId', 'anyDeviceId', {
         kind: 'user',
         id: userId
@@ -832,7 +846,10 @@ describe('Actions', () => {
     it('allows group admins if requesting group pairs', async () => {
       const userId = 'testUserId'
       const groupId = 'testGroupId'
-      const handler = new GetKeyPairs(userId, 'anyDeviceId', { kind: 'group', id: groupId })
+      const handler = new GetKeyPairs(userId, 'anyDeviceId', {
+        kind: 'group',
+        id: groupId
+      })
 
       service.getIsGroupAdmin = jest.fn().mockResolvedValue(true)
       expect(await handler.checkIsAuthorized(service)).toEqual(true)
@@ -877,7 +894,10 @@ describe('Actions', () => {
       db.getUser = jest.fn().mockResolvedValue(user)
       db.getDevice = jest.fn().mockResolvedValue(device)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'user', id: userId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'user',
+        id: userId
+      })
 
       expect(await handler.execute(service)).toEqual({
         id: userId,
@@ -923,7 +943,10 @@ describe('Actions', () => {
       db.getGroup = jest.fn().mockResolvedValue(group)
       db.getDevice = jest.fn().mockResolvedValue(device)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'group', id: groupId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'group',
+        id: groupId
+      })
 
       expect(await handler.execute(service)).toEqual({
         id: groupId,
@@ -973,7 +996,10 @@ describe('Actions', () => {
       db.getDevice = jest.fn().mockResolvedValue(device)
       db.getMembership = jest.fn().mockResolvedValue(membership)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'group', id: groupId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'group',
+        id: groupId
+      })
 
       expect(await handler.execute(service)).toEqual({
         id: groupId,
@@ -1061,7 +1087,10 @@ describe('Actions', () => {
       db.getUser = jest.fn().mockResolvedValue(null)
       db.getDevice = jest.fn().mockResolvedValue(device)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'user', id: userId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'user',
+        id: userId
+      })
 
       let success = false
       try {
@@ -1090,7 +1119,10 @@ describe('Actions', () => {
       db.getGroup = jest.fn().mockResolvedValue(null)
       db.getDevice = jest.fn().mockResolvedValue(device)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'group', id: groupId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'group',
+        id: groupId
+      })
 
       let success = false
       try {
@@ -1128,7 +1160,10 @@ describe('Actions', () => {
       db.getDevice = jest.fn().mockResolvedValue(device)
       db.getMembership = jest.fn().mockResolvedValue(null)
 
-      const handler = new GetKeyPairs(userId, deviceId, { kind: 'group', id: groupId })
+      const handler = new GetKeyPairs(userId, deviceId, {
+        kind: 'group',
+        id: groupId
+      })
 
       let success = false
       try {

@@ -1,8 +1,4 @@
-import { initSEA } from '../SEA'
-
-const Gun = require('gun/gun')
-require('gun/sea')
-const SEA = initSEA(Gun)
+import { SEA } from '../SEA'
 
 describe('SEA signatures', () => {
   const documentA = 'This is a test document'

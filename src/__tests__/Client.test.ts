@@ -1,9 +1,5 @@
 import { Client } from '../Client'
-import { initSEA } from '../SEA'
-
-const Gun = require('gun/gun')
-require('gun/sea')
-const SEA = initSEA(Gun)
+import { SEA } from '../SEA'
 
 describe('Client', () => {
   let service: ServiceInterface

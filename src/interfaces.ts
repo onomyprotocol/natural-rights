@@ -468,3 +468,73 @@ interface GetKeyPairsResult extends GetKeyPairsAction {
   cryptPubKey: string
   encCryptPrivKey: string
 }
+
+/**
+ * Used by Client App WebView to interact with Natural Rights
+ */
+interface NaturalRightsAppService {
+  /**
+   * Generate device keys and register a new user account
+   *
+   * The returned secrets should be stored and the caller must fulfill the
+   * returned DID request to complete signup.
+   *
+   * @returns a Promise resolving device secrets and a DID request token.
+   */
+  signup(): Promise<{
+    DIDRequestToken: string // Caller is expected to fulfill DID request to complete signup
+    secrets: DeviceSecrets // Caller is expected to permanently and securely store
+  }>
+
+  /**
+   * Authorize another device to access the account associated with given device keys
+   *
+   * @param deviceSecrets Returned from signup (should be stored)
+   * @param deviceToAuthId Provided by other app/device QR Code
+   * @param durationInMs Max amount of time device should be authorized
+   * @param idleTimeoutInMs How long the device can be idle before being de-authorized
+   *
+   * @returns a Promise
+   */
+  authorize(
+    deviceSecrets: DeviceSecrets,
+    deviceToAuthId: string,
+    durationInMs?: number,
+    idleTimeoutInMs?: number
+  ): Promise<void>
+
+  /**
+   * Revoke authorization for another device from the account associated with given device keys
+   *
+   * @param deviceSecrets Returned from signup (should be stored)
+   * @param deviceToAuthId From list of active sessions
+   *
+   * @returns a Promise
+   */
+  deauthorize(deviceSecrets: DeviceSecrets, deviceToDeauthId: string): Promise<void>
+
+  /**
+   * Resolves a list of currently active devices for potential deauthorization
+   *
+   * @returns a Promise resolving an array of {ActiveDevice}'s
+   */
+  getActiveDevices(): Promise<ActiveDevice[]>
+}
+
+/**
+ * Secrets representing a device in Natural Rights
+ */
+interface DeviceSecrets {
+  cryptKeyPair: KeyPair
+  signKeyPair: KeyPair
+}
+
+/**
+ * A device authorized to access the user
+ */
+interface ActiveDevice {
+  id: string
+  authorized: number
+  expires: number
+  idleTimeoutInMs: number
+}

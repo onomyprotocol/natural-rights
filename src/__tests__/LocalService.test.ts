@@ -1,11 +1,7 @@
 import { LocalService } from '../LocalService'
 import { ActionHandler } from '../actions/ActionHandler'
 import { CreateDocument } from '../actions'
-import { initSEA } from '../SEA'
-
-const Gun = require('gun/gun')
-require('gun/sea')
-const SEA = initSEA(Gun)
+import { SEA } from '../SEA'
 
 describe('LocalService', () => {
   let primitives: PrimitivesInterface
@@ -415,7 +411,9 @@ describe('LocalService', () => {
       db.getDocument = jest.fn().mockResolvedValue(document)
       db.getDocumentGrants = jest.fn().mockResolvedValue([])
 
-      expect(await service.getCredentials(userId, documentId)).toEqual({ document })
+      expect(await service.getCredentials(userId, documentId)).toEqual({
+        document
+      })
       expect(db.getDocument).toBeCalledWith(documentId)
       expect(db.getDocumentGrants).toBeCalledWith(documentId)
     })
@@ -447,7 +445,10 @@ describe('LocalService', () => {
         grant
       ])
 
-      expect(await service.getCredentials(userId, documentId)).toEqual({ document, grant })
+      expect(await service.getCredentials(userId, documentId)).toEqual({
+        document,
+        grant
+      })
       expect(db.getDocument).toBeCalledWith(documentId)
       expect(db.getDocumentGrants).toBeCalledWith(documentId)
       expect(db.getMembership).toBeCalledWith('someRandomGroup', userId)

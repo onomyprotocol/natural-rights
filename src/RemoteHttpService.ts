@@ -1,4 +1,5 @@
 import 'isomorphic-fetch'
+declare const fetch: any
 
 export class RemoteHttpService implements ServiceInterface {
   primitives: PrimitivesInterface
