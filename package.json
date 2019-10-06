@@ -1,12 +1,15 @@
 {
   "name": "natural-rights",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "",
   "keywords": [],
   "main": "dist/natural-rights.umd.js",
   "module": "dist/natural-rights.es5.js",
   "typings": "dist/types/natural-rights.d.ts",
-  "files": ["dist", "es"],
+  "files": [
+    "dist",
+    "es"
+  ],
   "engines": {
     "node": ">=6.0.0"
   },
@@ -16,6 +19,8 @@
     "prepare": "npm run prebuild && npm run build",
     "build": "tsc --module commonjs && rollup -c rollup.config.ts && typedoc --out docs --target es6 --theme minimal --mode file src && rimraf es/__tests__",
     "start": "rollup -c rollup.config.ts -w",
+    "fix:prettier": "prettier \"src/**/*.ts\" --write",
+    "fix:tslint": "tslint --fix --project .",
     "test": "jest --coverage",
     "test:watch": "jest --coverage --watch",
     "test:prod": "npm run lint && npm run test -- --no-cache",
@@ -28,7 +33,10 @@
     "travis-deploy-once": "travis-deploy-once"
   },
   "lint-staged": {
-    "{src,test}/**/*.ts": ["prettier --write", "git add"]
+    "{src,test}/**/*.ts": [
+      "prettier --write",
+      "git add"
+    ]
   },
   "config": {
     "commitizen": {
@@ -41,9 +49,20 @@
     },
     "testEnvironment": "node",
     "testRegex": "(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$",
-    "testPathIgnorePatterns": ["/node_modules/", "/dist/", "/es/"],
-    "moduleFileExtensions": ["ts", "tsx", "js"],
-    "coveragePathIgnorePatterns": ["/node_modules/", "/test/"],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/",
+      "/es/"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/test/"
+    ],
     "coverageThreshold": {
       "global": {
         "branches": 90,
@@ -52,7 +71,10 @@
         "statements": 95
       }
     },
-    "collectCoverageFrom": ["src/*.{js,ts}", "src/actions/*.{js,ts}"],
+    "collectCoverageFrom": [
+      "src/*.{js,ts}",
+      "src/actions/*.{js,ts}"
+    ],
     "reporters": [
       "default",
       [
@@ -68,7 +90,9 @@
     "singleQuote": true
   },
   "commitlint": {
-    "extends": ["@commitlint/config-conventional"]
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^8.0.0",
@@ -111,7 +135,7 @@
     "typescript": "^3.5.1"
   },
   "dependencies": {
-    "@notabug/gun-sear": "^0.0.18",
+    "@notabug/gun-sear": "^0.0.22",
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
     "isomorphic-fetch": "^2.2.1",
